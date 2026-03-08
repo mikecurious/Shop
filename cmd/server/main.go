@@ -86,6 +86,7 @@ func main() {
 	r.SetFuncMap(template.FuncMap{
 		"add": func(a, b int) int { return a + b },
 		"sub": func(a, b int) int { return a - b },
+		"mul": func(a float64, b int) float64 { return a * float64(b) },
 		"fmtMoney": func(f float64) string { return fmt.Sprintf("KES %.2f", f) },
 		"fmtDate":  func(t time.Time) string { return t.Format("02 Jan 2006") },
 		"fmtDateTime": func(t time.Time) string { return t.Format("02 Jan 2006 15:04") },
