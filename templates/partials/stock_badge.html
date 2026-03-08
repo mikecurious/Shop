@@ -1,0 +1,7 @@
+{{define "partials/stock_badge.html"}}
+{{if .product}}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{if .product.IsLowStock}}bg-red-100 text-red-800{{else}}bg-green-100 text-green-800{{end}}">
+  {{.product.Quantity}} in stock
+</span>
+{{end}}
+{{end}}

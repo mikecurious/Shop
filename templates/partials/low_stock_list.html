@@ -1,0 +1,19 @@
+{{define "partials/low_stock_list.html"}}
+{{if .products}}
+<ul class="divide-y divide-gray-100">
+  {{range .products}}
+  <li class="flex items-center justify-between py-2">
+    <div>
+      <p class="text-sm font-medium text-gray-900">{{.Name}}</p>
+      <p class="text-xs text-gray-500">SKU: {{.SKU}}</p>
+    </div>
+    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+      {{.Quantity}} / {{.ReorderLevel}}
+    </span>
+  </li>
+  {{end}}
+</ul>
+{{else}}
+<p class="text-sm text-gray-500 text-center py-4">No low stock items</p>
+{{end}}
+{{end}}
