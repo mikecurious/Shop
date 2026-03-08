@@ -3,8 +3,6 @@ services:
     image: mongo:7
     container_name: kiosk-mongodb
     restart: unless-stopped
-    ports:
-      - "27017:27017"
     volumes:
       - mongo_data:/data/db
     healthcheck:
@@ -12,6 +10,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - internal
 
   app:
     build:
@@ -26,11 +26,21 @@ services:
       - .env
     environment:
       MONGODB_URI: mongodb://mongodb:27017
-    ports:
-      - "${APP_PORT:-8080}:8080"
+      VIRTUAL_HOST: shop.dominicatechnologies.com
+      LETSENCRYPT_HOST: shop.dominicatechnologies.com
+    expose:
+      - "8080"
     volumes:
       - ./templates:/app/templates:ro
       - ./static:/app/static:ro
+    networks:
+      - internal
+      - nginx-proxy
 
 volumes:
   mongo_data:
+
+networks:
+  internal:
+  nginx-proxy:
+    external: true
