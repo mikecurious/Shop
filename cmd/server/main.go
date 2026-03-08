@@ -78,8 +78,9 @@ func main() {
 	r.Use(middleware.Logger())
 	r.Use(gin.Recovery())
 
+	allowedOrigins := []string{cfg.App.BaseURL, "https://api.shop.dominicatechnologies.com"}
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{cfg.App.BaseURL},
+		AllowOrigins:     allowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,
