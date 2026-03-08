@@ -1,4 +1,4 @@
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 RUN apk add --no-cache git ca-certificates
 
@@ -17,7 +17,6 @@ RUN apk add --no-cache ca-certificates tzdata
 
 WORKDIR /app
 COPY --from=builder /build/kiosk-server .
-COPY --from=builder /build/migrations ./migrations
 COPY --from=builder /build/templates ./templates
 COPY --from=builder /build/static ./static
 
