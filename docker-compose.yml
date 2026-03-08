@@ -11,7 +11,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - internal
+      - shop
 
   app:
     build:
@@ -34,13 +34,14 @@ services:
       - ./templates:/app/templates:ro
       - ./static:/app/static:ro
     networks:
-      - internal
+      - shop
       - app-network
 
 volumes:
   mongo_data:
 
 networks:
-  internal:
+  shop:
+    external: true
   app-network:
     external: true
