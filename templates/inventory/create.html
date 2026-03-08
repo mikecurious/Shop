@@ -1,0 +1,108 @@
+{{template "nav" .}}
+
+<div class="max-w-2xl">
+  <div class="flex items-center gap-3 mb-6">
+    <a href="/inventory" class="text-gray-400 hover:text-gray-600"><i class="fas fa-arrow-left"></i></a>
+    <h1 class="text-2xl font-bold text-gray-900">Add Product</h1>
+  </div>
+
+  {{if .error}}
+  <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-5 flex items-center gap-2">
+    <i class="fas fa-exclamation-circle"></i>
+    <span>{{.error}}</span>
+  </div>
+  {{end}}
+
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <form method="POST" action="/inventory/create" class="space-y-5">
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Product Name <span class="text-red-500">*</span></label>
+          <input type="text" name="name" required autofocus
+            value="{{if .req}}{{.req.Name}}{{end}}"
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+          <textarea name="description" rows="2"
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">{{if .req}}{{.req.Description}}{{end}}</textarea>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+          <select name="category_id" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+            <option value="">No Category</option>
+            {{range .categories}}
+            <option value="{{.ID}}">{{.Name}}</option>
+            {{end}}
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">SKU</label>
+          <input type="text" name="sku" placeholder="Auto-generated if blank"
+            value="{{if .req}}{{.req.SKU}}{{end}}"
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Buying Price (KES) <span class="text-red-500">*</span></label>
+          <input type="number" name="buying_price" step="0.01" min="0" required
+            value="{{if .req}}{{.req.BuyingPrice}}{{end}}"
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Selling Price (KES) <span class="text-red-500">*</span></label>
+          <input type="number" name="selling_price" step="0.01" min="0" required
+            value="{{if .req}}{{.req.SellingPrice}}{{end}}"
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Opening Stock</label>
+          <input type="number" name="quantity" min="0" value="{{if .req}}{{.req.Quantity}}{{else}}0{{end}}"
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Reorder Level</label>
+          <input type="number" name="reorder_level" min="0" value="{{if .req}}{{.req.ReorderLevel}}{{else}}5{{end}}"
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Supplier Name</label>
+          <input type="text" name="supplier_name"
+            value="{{if .req}}{{.req.SupplierName}}{{end}}"
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Supplier Phone</label>
+          <input type="tel" name="supplier_phone"
+            value="{{if .req}}{{.req.SupplierPhone}}{{end}}"
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+      </div>
+
+      <div class="bg-indigo-50 rounded-lg p-4 text-sm text-indigo-700">
+        <i class="fas fa-info-circle mr-2"></i>
+        A unique barcode will be auto-generated for this product.
+      </div>
+
+      <div class="flex gap-3 pt-2">
+        <a href="/inventory" class="flex-1 border border-gray-200 text-gray-700 py-2 rounded-lg text-sm hover:bg-gray-50 text-center font-medium">
+          Cancel
+        </a>
+        <button type="submit" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-sm hover:bg-indigo-700 font-medium">
+          <i class="fas fa-plus mr-1"></i> Create Product
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{{template "nav-end" .}}

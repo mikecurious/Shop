@@ -1,0 +1,3 @@
+Name,Description,SKU,Category,Buying Price,Selling Price,Quantity,Reorder Level,Supplier Name
+Example Product,A sample product description,PRD-001,Beverages,50.00,80.00,100,10,Sample Supplier
+Another Item,Another description,PRD-002,Snacks,30.00,50.00,50,5,Another Supplier

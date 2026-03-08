@@ -1,0 +1,117 @@
+{{define "nav"}}
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{.title}} — Kiosk Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    .sidebar-active { background-color: rgba(255,255,255,0.15); }
+    .htmx-request.htmx-indicator, .htmx-request .htmx-indicator { display: inline; }
+    .htmx-indicator { display: none; }
+  </style>
+</head>
+<body class="h-full flex">
+  <!-- Sidebar -->
+  <aside class="hidden md:flex md:flex-col w-64 bg-indigo-900 flex-shrink-0 min-h-screen">
+    <div class="flex items-center gap-3 px-5 py-4 border-b border-indigo-700">
+      <div class="w-9 h-9 bg-white rounded-lg flex items-center justify-center">
+        <i class="fas fa-store text-indigo-700"></i>
+      </div>
+      <span class="text-white font-bold text-lg">Kiosk Manager</span>
+    </div>
+
+    {{if .claims}}
+    <div class="px-5 py-3 border-b border-indigo-800">
+      <p class="text-white text-sm font-medium">{{.claims.Name}}</p>
+      <p class="text-indigo-300 text-xs capitalize">{{.claims.Role}}</p>
+    </div>
+    {{end}}
+
+    <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <a href="/dashboard" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
+        <i class="fas fa-tachometer-alt w-5 text-center text-indigo-300"></i> Dashboard
+      </a>
+      <a href="/inventory" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
+        <i class="fas fa-boxes w-5 text-center text-indigo-300"></i> Inventory
+      </a>
+      <a href="/sales/pos" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
+        <i class="fas fa-cash-register w-5 text-center text-indigo-300"></i> Point of Sale
+      </a>
+      <a href="/sales" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
+        <i class="fas fa-receipt w-5 text-center text-indigo-300"></i> Sales
+      </a>
+      <a href="/payments" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
+        <i class="fas fa-mobile-alt w-5 text-center text-indigo-300"></i> M-Pesa
+      </a>
+      <a href="/dashboard/pl" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
+        <i class="fas fa-chart-line w-5 text-center text-indigo-300"></i> P&amp;L Report
+      </a>
+      <a href="/reports" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
+        <i class="fas fa-file-alt w-5 text-center text-indigo-300"></i> Reports
+      </a>
+      {{if .claims}}{{if isAdmin .claims.Role}}
+      <div class="pt-3 mt-3 border-t border-indigo-800">
+        <p class="px-3 text-xs text-indigo-400 uppercase tracking-wider font-semibold mb-2">Admin</p>
+        <a href="/admin/users" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
+          <i class="fas fa-users w-5 text-center text-indigo-300"></i> Users
+        </a>
+      </div>
+      {{end}}{{end}}
+    </nav>
+
+    <div class="px-3 py-3 border-t border-indigo-800 space-y-1">
+      <a href="/profile" class="flex items-center gap-3 px-3 py-2 rounded-lg text-indigo-200 hover:bg-white/10 text-sm transition">
+        <i class="fas fa-user-circle w-5 text-center"></i> Profile
+      </a>
+      <a href="/logout" class="flex items-center gap-3 px-3 py-2 rounded-lg text-indigo-200 hover:bg-white/10 text-sm transition">
+        <i class="fas fa-sign-out-alt w-5 text-center"></i> Logout
+      </a>
+    </div>
+  </aside>
+
+  <!-- Page wrapper -->
+  <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+    <!-- Top bar (mobile) -->
+    <div class="md:hidden bg-indigo-900 px-4 py-3 flex items-center justify-between">
+      <span class="text-white font-bold">Kiosk Manager</span>
+      <button onclick="document.getElementById('mobile-nav').classList.toggle('hidden')" class="text-white">
+        <i class="fas fa-bars"></i>
+      </button>
+    </div>
+
+    <!-- Main content area -->
+    <main class="flex-1 overflow-y-auto">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+{{end}}
+
+{{define "nav-end"}}
+      </div>
+    </main>
+  </div>
+</body>
+<!-- Toast container -->
+<div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+<script>
+  // Active nav highlighting
+  document.querySelectorAll('aside a').forEach(a => {
+    if (a.getAttribute('href') !== '/' && window.location.pathname.startsWith(a.getAttribute('href'))) {
+      a.classList.add('bg-white/20', 'text-white');
+    }
+  });
+
+  function showToast(msg, type='success') {
+    const toast = document.createElement('div');
+    const bg = type==='error' ? 'bg-red-500' : type==='warning' ? 'bg-yellow-500' : 'bg-green-500';
+    toast.className = `${bg} text-white px-4 py-3 rounded-lg shadow-lg text-sm flex items-center gap-2 max-w-sm transition-opacity duration-300`;
+    toast.innerHTML = `<i class="fas fa-${type==='error'?'exclamation-circle':'check-circle'}"></i><span>${msg}</span>`;
+    document.getElementById('toast-container').appendChild(toast);
+    setTimeout(() => { toast.style.opacity='0'; setTimeout(()=>toast.remove(), 300); }, 3500);
+  }
+</script>
+</html>
+{{end}}

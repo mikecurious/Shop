@@ -1,0 +1,97 @@
+{{template "nav" .}}
+
+<div class="max-w-lg mx-auto">
+  <div class="flex items-center justify-between mb-5">
+    <div class="flex items-center gap-3">
+      <a href="/sales" class="text-gray-400 hover:text-gray-600"><i class="fas fa-arrow-left"></i></a>
+      <h1 class="text-xl font-bold text-gray-900">Receipt</h1>
+    </div>
+    <div class="flex gap-2 print:hidden">
+      <button onclick="window.print()" class="bg-white border border-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm hover:bg-gray-50 flex items-center gap-2">
+        <i class="fas fa-print"></i> Print
+      </button>
+      <a href="/sales/{{.sale.ID}}/receipt/pdf"
+         class="bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-indigo-700 flex items-center gap-2">
+        <i class="fas fa-file-pdf"></i> PDF
+      </a>
+    </div>
+  </div>
+
+  {{with .sale}}
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 font-mono text-sm" id="receipt">
+    <!-- Header -->
+    <div class="text-center border-b border-dashed border-gray-200 pb-5 mb-5">
+      <p class="text-xl font-bold text-gray-900">KIOSK MANAGER</p>
+      <p class="text-gray-500 text-xs mt-1">Official Receipt</p>
+      <p class="text-gray-400 text-xs">{{fmtDateTime .CreatedAt}}</p>
+      <p class="text-gray-400 text-xs mt-1">Receipt #: {{slice .ID.String 0 8 | printf "%s" | printf "%s" }}</p>
+    </div>
+
+    <!-- Customer -->
+    {{if .CustomerName}}
+    <div class="mb-4 text-xs">
+      <p class="text-gray-500">Customer: <span class="text-gray-800 font-medium">{{.CustomerName}}</span></p>
+      {{if .CustomerPhone}}<p class="text-gray-500">Phone: {{.CustomerPhone}}</p>{{end}}
+    </div>
+    {{end}}
+
+    <!-- Items -->
+    <div class="border-t border-dashed border-gray-200 pt-4 mb-4">
+      <div class="flex text-xs text-gray-400 font-semibold mb-2">
+        <span class="flex-1">Item</span>
+        <span class="w-10 text-center">Qty</span>
+        <span class="w-20 text-right">Price</span>
+        <span class="w-20 text-right">Sub</span>
+      </div>
+      {{range .Items}}
+      <div class="flex text-xs py-1.5 border-b border-gray-50 last:border-0">
+        <span class="flex-1 text-gray-800 truncate pr-2">{{.ProductName}}</span>
+        <span class="w-10 text-center text-gray-500">{{.Quantity}}</span>
+        <span class="w-20 text-right text-gray-600">{{printf "%.2f" .UnitPrice}}</span>
+        <span class="w-20 text-right font-medium text-gray-800">{{printf "%.2f" .Subtotal}}</span>
+      </div>
+      {{end}}
+    </div>
+
+    <!-- Totals -->
+    <div class="border-t border-dashed border-gray-200 pt-3 space-y-1 text-xs">
+      <div class="flex justify-between text-gray-600">
+        <span>Subtotal</span>
+        <span>KES {{printf "%.2f" .TotalAmount}}</span>
+      </div>
+      {{if gt .DiscountAmount 0.0}}
+      <div class="flex justify-between text-red-600">
+        <span>Discount ({{.DiscountType}} {{printf "%.0f" .DiscountValue}}{{if eq .DiscountType "percentage"}}%{{end}})</span>
+        <span>-KES {{printf "%.2f" .DiscountAmount}}</span>
+      </div>
+      {{end}}
+      <div class="flex justify-between font-bold text-gray-900 text-base border-t border-dashed border-gray-200 pt-2 mt-2">
+        <span>TOTAL</span>
+        <span>KES {{printf "%.2f" .NetAmount}}</span>
+      </div>
+    </div>
+
+    <!-- Payment -->
+    <div class="border-t border-dashed border-gray-200 pt-3 mt-3 text-xs text-gray-600">
+      <p>Payment: <span class="font-semibold capitalize text-gray-800">{{.PaymentMethod}}</span></p>
+      {{if .PaymentReference}}<p>Reference: {{.PaymentReference}}</p>{{end}}
+    </div>
+
+    <!-- Footer -->
+    <div class="text-center mt-6 pt-4 border-t border-dashed border-gray-200 text-xs text-gray-400">
+      <p>Thank you for your purchase!</p>
+      <p class="mt-1">Served by: {{.CreatedByName}}</p>
+    </div>
+  </div>
+  {{end}}
+</div>
+
+<style>
+@media print {
+  aside, header, .print\\:hidden, .fixed { display: none !important; }
+  body { padding: 0; }
+  #receipt { box-shadow: none; border: none; max-width: 80mm; margin: 0 auto; }
+}
+</style>
+
+{{template "nav-end" .}}

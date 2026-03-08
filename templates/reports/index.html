@@ -1,0 +1,121 @@
+{{template "nav" .}}
+
+<div class="space-y-5">
+  <h1 class="text-2xl font-bold text-gray-900">Reports</h1>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+
+    <!-- Sales Report -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div class="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center mb-4">
+        <i class="fas fa-chart-bar text-indigo-600"></i>
+      </div>
+      <h2 class="font-semibold text-gray-800 mb-1">Sales Report</h2>
+      <p class="text-gray-400 text-sm mb-4">Export all sales transactions to CSV</p>
+      <form action="/reports/sales/csv" method="GET" class="space-y-2">
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-xs text-gray-500">From</label>
+            <input type="date" name="from" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500">To</label>
+            <input type="date" name="to" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+        </div>
+        <button type="submit" class="w-full bg-indigo-600 text-white py-2 rounded-lg text-sm hover:bg-indigo-700 flex items-center justify-center gap-2">
+          <i class="fas fa-download"></i> Download CSV
+        </button>
+      </form>
+    </div>
+
+    <!-- Inventory Report -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div class="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center mb-4">
+        <i class="fas fa-boxes text-green-600"></i>
+      </div>
+      <h2 class="font-semibold text-gray-800 mb-1">Inventory Report</h2>
+      <p class="text-gray-400 text-sm mb-4">Full inventory valuation with stock levels and margins</p>
+      <a href="/reports/inventory/csv"
+         class="block w-full bg-green-600 text-white py-2 rounded-lg text-sm hover:bg-green-700 text-center flex items-center justify-center gap-2">
+        <i class="fas fa-download"></i> Download CSV
+      </a>
+    </div>
+
+    <!-- P&L Report -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div class="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center mb-4">
+        <i class="fas fa-chart-line text-purple-600"></i>
+      </div>
+      <h2 class="font-semibold text-gray-800 mb-1">Profit & Loss</h2>
+      <p class="text-gray-400 text-sm mb-4">Revenue vs COGS vs gross profit by period</p>
+      <form class="space-y-2">
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-xs text-gray-500">From</label>
+            <input type="date" id="pl-from" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500">To</label>
+            <input type="date" id="pl-to" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <a id="pl-csv-btn" href="/reports/pl/csv"
+             class="flex-1 bg-purple-600 text-white py-2 rounded-lg text-sm hover:bg-purple-700 text-center flex items-center justify-center gap-1">
+            <i class="fas fa-table text-xs"></i> CSV
+          </a>
+          <a id="pl-pdf-btn" href="/reports/pl/pdf"
+             class="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm hover:bg-red-700 text-center flex items-center justify-center gap-1">
+            <i class="fas fa-file-pdf text-xs"></i> PDF
+          </a>
+        </div>
+      </form>
+    </div>
+
+  </div>
+
+  <!-- Quick Links -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <h2 class="font-semibold text-gray-800 mb-4">Quick Analysis</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <a href="/dashboard/pl?from={{.today_minus_7}}&group_by=day"
+         class="border border-gray-200 rounded-lg p-3 text-center hover:border-indigo-400 hover:bg-indigo-50 transition">
+        <i class="fas fa-calendar-week text-indigo-500 text-xl mb-2 block"></i>
+        <p class="text-xs font-medium text-gray-700">Last 7 Days</p>
+      </a>
+      <a href="/dashboard/pl?group_by=month"
+         class="border border-gray-200 rounded-lg p-3 text-center hover:border-indigo-400 hover:bg-indigo-50 transition">
+        <i class="fas fa-calendar-alt text-indigo-500 text-xl mb-2 block"></i>
+        <p class="text-xs font-medium text-gray-700">Monthly View</p>
+      </a>
+      <a href="/inventory?low_stock=1"
+         class="border border-gray-200 rounded-lg p-3 text-center hover:border-red-400 hover:bg-red-50 transition">
+        <i class="fas fa-exclamation-triangle text-red-500 text-xl mb-2 block"></i>
+        <p class="text-xs font-medium text-gray-700">Low Stock</p>
+      </a>
+      <a href="/dashboard"
+         class="border border-gray-200 rounded-lg p-3 text-center hover:border-green-400 hover:bg-green-50 transition">
+        <i class="fas fa-tachometer-alt text-green-500 text-xl mb-2 block"></i>
+        <p class="text-xs font-medium text-gray-700">Dashboard</p>
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Wire up P&L export buttons
+  function updatePLLinks() {
+    const from = document.getElementById('pl-from').value;
+    const to = document.getElementById('pl-to').value;
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    document.getElementById('pl-csv-btn').href = '/reports/pl/csv?' + params;
+    document.getElementById('pl-pdf-btn').href = '/reports/pl/pdf?' + params;
+  }
+  document.getElementById('pl-from').addEventListener('change', updatePLLinks);
+  document.getElementById('pl-to').addEventListener('change', updatePLLinks);
+</script>
+
+{{template "nav-end" .}}

@@ -1,0 +1,136 @@
+{{template "nav" .}}
+
+<div class="space-y-6">
+  <div class="flex items-center justify-between flex-wrap gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Profit & Loss Report</h1>
+      <p class="text-gray-500 text-sm">{{.from}} to {{.to}}</p>
+    </div>
+    <div class="flex gap-2 flex-wrap">
+      <a href="/reports/pl/csv?from={{.from}}&to={{.to}}&group_by={{.groupBy}}"
+         class="bg-white border border-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm hover:bg-gray-50 flex items-center gap-2">
+        <i class="fas fa-download"></i> CSV
+      </a>
+      <a href="/reports/pl/pdf?from={{.from}}&to={{.to}}"
+         class="bg-white border border-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm hover:bg-gray-50 flex items-center gap-2">
+        <i class="fas fa-file-pdf text-red-500"></i> PDF
+      </a>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+    <form method="GET" action="/dashboard/pl" class="flex flex-wrap gap-4 items-end">
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">From</label>
+        <input type="date" name="from" value="{{.from}}"
+          class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">To</label>
+        <input type="date" name="to" value="{{.to}}"
+          class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">Group By</label>
+        <select name="group_by" class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+          <option value="day" {{if eq .groupBy "day"}}selected{{end}}>Daily</option>
+          <option value="week" {{if eq .groupBy "week"}}selected{{end}}>Weekly</option>
+          <option value="month" {{if eq .groupBy "month"}}selected{{end}}>Monthly</option>
+        </select>
+      </div>
+      <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700">
+        Apply
+      </button>
+    </form>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <p class="text-xs font-semibold text-gray-400 uppercase">Total Revenue</p>
+      <p class="text-3xl font-bold text-gray-900 mt-2">KES {{printf "%.2f" .totalRevenue}}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <p class="text-xs font-semibold text-gray-400 uppercase">Total COGS</p>
+      <p class="text-3xl font-bold text-gray-700 mt-2">KES {{printf "%.2f" .totalCOGS}}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <p class="text-xs font-semibold text-gray-400 uppercase">Gross Profit</p>
+      <p class="text-3xl font-bold {{if gt .totalProfit 0.0}}text-green-700{{else}}text-red-700{{end}} mt-2">
+        KES {{printf "%.2f" .totalProfit}}
+      </p>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <canvas id="plChart" height="80"></canvas>
+  </div>
+
+  <!-- Table -->
+  {{if .plData}}
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-100 text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Period</th>
+          <th class="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Sales</th>
+          <th class="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Revenue</th>
+          <th class="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase">COGS</th>
+          <th class="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Gross Profit</th>
+          <th class="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Margin</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {{range .plData}}
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-3 font-medium text-gray-800">{{.Period}}</td>
+          <td class="px-6 py-3 text-right text-gray-600">{{.SaleCount}}</td>
+          <td class="px-6 py-3 text-right font-semibold text-gray-800">KES {{printf "%.2f" .Revenue}}</td>
+          <td class="px-6 py-3 text-right text-gray-600">KES {{printf "%.2f" .COGS}}</td>
+          <td class="px-6 py-3 text-right font-semibold {{if gt .GrossProfit 0.0}}text-green-700{{else}}text-red-700{{end}}">
+            KES {{printf "%.2f" .GrossProfit}}
+          </td>
+          <td class="px-6 py-3 text-right">
+            <span class="{{if gt .Margin 25.0}}bg-green-100 text-green-700{{else if gt .Margin 10.0}}bg-yellow-100 text-yellow-700{{else}}bg-red-100 text-red-700{{end}} px-2 py-0.5 rounded-full text-xs font-semibold">
+              {{printf "%.1f" .Margin}}%
+            </span>
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{end}}
+</div>
+
+<script>
+(function() {
+  {{if .plData}}
+  const data = [{{range .plData}}{p:"{{.Period}}",r:{{.Revenue}},c:{{.COGS}},g:{{.GrossProfit}}},{{end}}];
+  {{else}}
+  const data = [];
+  {{end}}
+  if (data.length > 0) {
+    new Chart(document.getElementById('plChart'), {
+      type: 'bar',
+      data: {
+        labels: data.map(d => d.p),
+        datasets: [
+          { label: 'Revenue', data: data.map(d => d.r), backgroundColor: 'rgba(99,102,241,0.7)' },
+          { label: 'COGS', data: data.map(d => d.c), backgroundColor: 'rgba(239,68,68,0.5)' },
+          { label: 'Gross Profit', data: data.map(d => d.g), backgroundColor: 'rgba(16,185,129,0.7)' }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'top' } },
+        scales: { y: { beginAtZero: true, ticks: { callback: v => 'KES ' + v.toLocaleString() } } }
+      }
+    });
+  }
+})();
+</script>
+
+{{template "nav-end" .}}

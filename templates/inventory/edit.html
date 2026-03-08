@@ -1,0 +1,110 @@
+{{template "nav" .}}
+
+<div class="max-w-2xl">
+  <div class="flex items-center gap-3 mb-6">
+    <a href="/inventory/{{.product.ID}}" class="text-gray-400 hover:text-gray-600"><i class="fas fa-arrow-left"></i></a>
+    <h1 class="text-2xl font-bold text-gray-900">Edit Product</h1>
+  </div>
+
+  {{if .error}}
+  <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-5 flex items-center gap-2">
+    <i class="fas fa-exclamation-circle"></i>
+    <span>{{.error}}</span>
+  </div>
+  {{end}}
+
+  {{with .product}}
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <form method="POST" action="/inventory/{{.ID}}/edit" class="space-y-5">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
+          <input type="text" name="name" value="{{.Name}}" required
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+          <textarea name="description" rows="2"
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">{{.Description}}</textarea>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+          <select name="category_id" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+            <option value="">No Category</option>
+            {{range $.categories}}
+            <option value="{{.ID}}" {{if and $.product.CategoryID (eq (printf "%s" $.product.CategoryID) (printf "%s" .ID))}}selected{{end}}>
+              {{.Name}}
+            </option>
+            {{end}}
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">SKU</label>
+          <input type="text" value="{{.SKU}}" disabled
+            class="w-full border border-gray-100 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-400">
+          <p class="text-xs text-gray-400 mt-1">SKU cannot be changed after creation</p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Buying Price (KES)</label>
+          <input type="number" name="buying_price" step="0.01" min="0" value="{{.BuyingPrice}}"
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Selling Price (KES)</label>
+          <input type="number" name="selling_price" step="0.01" min="0" value="{{.SellingPrice}}"
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Reorder Level</label>
+          <input type="number" name="reorder_level" min="0" value="{{.ReorderLevel}}"
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Supplier Name</label>
+          <input type="text" name="supplier_name" value="{{.SupplierName}}"
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Supplier Phone</label>
+          <input type="tel" name="supplier_phone" value="{{.SupplierPhone}}"
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+      </div>
+
+      <div class="flex gap-3 pt-2">
+        <a href="/inventory/{{.ID}}" class="flex-1 border border-gray-200 text-gray-700 py-2 rounded-lg text-sm hover:bg-gray-50 text-center font-medium">
+          Cancel
+        </a>
+        <button type="submit" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-sm hover:bg-indigo-700 font-medium">
+          <i class="fas fa-save mr-1"></i> Save Changes
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Danger Zone -->
+  {{if $.claims}}{{if isAdmin $.claims.Role}}
+  <div class="bg-red-50 border border-red-200 rounded-xl p-5 mt-4">
+    <h3 class="font-semibold text-red-800 mb-2">Danger Zone</h3>
+    <p class="text-sm text-red-600 mb-3">Deactivating this product will hide it from inventory and sales.</p>
+    <form method="POST" action="/inventory/{{.ID}}/delete"
+          onsubmit="return confirm('Deactivate this product?')">
+      <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700">
+        Deactivate Product
+      </button>
+    </form>
+  </div>
+  {{end}}{{end}}
+  {{end}}
+</div>
+
+{{template "nav-end" .}}

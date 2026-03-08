@@ -1,0 +1,20 @@
+# Binary
+kiosk-server
+*.exe
+
+# Environment
+.env
+
+# Build artifacts
+coverage.out
+coverage.html
+docs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp

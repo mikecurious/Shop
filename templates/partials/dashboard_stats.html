@@ -1,0 +1,32 @@
+{{define "partials/dashboard_stats.html"}}
+{{if .stats}}
+{{with .stats}}
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Today Revenue</p>
+    <p class="text-2xl font-bold text-gray-900 mt-1">KES {{printf "%.0f" .TodayRevenue}}</p>
+    <p class="text-xs text-gray-400 mt-1">{{.TodaySales}} sales</p>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Total Revenue</p>
+    <p class="text-2xl font-bold text-gray-900 mt-1">KES {{printf "%.0f" .TotalRevenue}}</p>
+    <p class="text-xs text-gray-400 mt-1">All time</p>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Gross Profit</p>
+    <p class="text-2xl font-bold {{if gt .GrossProfit 0.0}}text-green-700{{else}}text-red-700{{end}} mt-1">
+      KES {{printf "%.0f" .GrossProfit}}
+    </p>
+    <p class="text-xs text-gray-400 mt-1">{{printf "%.1f" .GrossMargin}}% margin</p>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Low Stock</p>
+    <p class="text-2xl font-bold {{if gt .LowStockCount 0}}text-red-600{{else}}text-green-600{{end}} mt-1">
+      {{.LowStockCount}}
+    </p>
+    <p class="text-xs text-gray-400 mt-1">items to restock</p>
+  </div>
+</div>
+{{end}}
+{{end}}
+{{end}}
