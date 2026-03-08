@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/michaelbrian/kiosk/internal/models"
 	"github.com/michaelbrian/kiosk/internal/repository"
 )
@@ -22,7 +21,7 @@ func NewSaleService(saleRepo *repository.SaleRepository, productRepo *repository
 	return &SaleService{saleRepo: saleRepo, productRepo: productRepo}
 }
 
-func (s *SaleService) CreateSale(ctx context.Context, req models.CreateSaleRequest, createdBy uuid.UUID) (*models.Sale, error) {
+func (s *SaleService) CreateSale(ctx context.Context, req models.CreateSaleRequest, createdBy string) (*models.Sale, error) {
 	sale := &models.Sale{
 		PaymentMethod:    req.PaymentMethod,
 		PaymentReference: "",
@@ -63,7 +62,6 @@ func (s *SaleService) CreateSale(ctx context.Context, req models.CreateSaleReque
 
 	sale.TotalAmount = total
 
-	// Apply discount
 	var discountAmount float64
 	switch req.DiscountType {
 	case "percentage":
@@ -84,7 +82,7 @@ func (s *SaleService) CreateSale(ctx context.Context, req models.CreateSaleReque
 	return sale, nil
 }
 
-func (s *SaleService) GetSale(ctx context.Context, id uuid.UUID) (*models.Sale, error) {
+func (s *SaleService) GetSale(ctx context.Context, id string) (*models.Sale, error) {
 	sale, err := s.saleRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err

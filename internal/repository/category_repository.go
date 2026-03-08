@@ -2,49 +2,47 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/michaelbrian/kiosk/internal/models"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type CategoryRepository struct {
-	db *DB
+	col *mongo.Collection
 }
 
 func NewCategoryRepository(db *DB) *CategoryRepository {
-	return &CategoryRepository{db: db}
+	return &CategoryRepository{col: db.Collection("categories")}
 }
 
 func (r *CategoryRepository) Create(ctx context.Context, c *models.Category) error {
-	c.ID = uuid.New()
+	c.ID = uuid.New().String()
 	c.CreatedAt = time.Now()
-	_, err := r.db.ExecContext(ctx,
-		`INSERT INTO categories (id, name, description, created_at) VALUES ($1,$2,$3,$4)`,
-		c.ID, c.Name, c.Description, c.CreatedAt)
+	_, err := r.col.InsertOne(ctx, c)
 	return err
 }
 
 func (r *CategoryRepository) List(ctx context.Context) ([]*models.Category, error) {
-	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, name, COALESCE(description,''), created_at FROM categories ORDER BY name`)
+	cursor, err := r.col.Find(ctx, bson.M{},
+		options.Find().SetSort(bson.D{{Key: "name", Value: 1}}))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list categories: %w", err)
 	}
-	defer rows.Close()
+	defer cursor.Close(ctx)
 
 	var cats []*models.Category
-	for rows.Next() {
-		c := &models.Category{}
-		if err := rows.Scan(&c.ID, &c.Name, &c.Description, &c.CreatedAt); err != nil {
-			return nil, err
-		}
-		cats = append(cats, c)
+	if err := cursor.All(ctx, &cats); err != nil {
+		return nil, fmt.Errorf("decode categories: %w", err)
 	}
-	return cats, rows.Err()
+	return cats, nil
 }
 
-func (r *CategoryRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	_, err := r.db.ExecContext(ctx, `DELETE FROM categories WHERE id = $1`, id)
+func (r *CategoryRepository) Delete(ctx context.Context, id string) error {
+	_, err := r.col.DeleteOne(ctx, bson.M{"_id": id})
 	return err
 }

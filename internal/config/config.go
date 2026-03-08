@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 
@@ -10,7 +9,7 @@ import (
 
 type Config struct {
 	App       AppConfig
-	DB        DBConfig
+	Mongo     MongoConfig
 	JWT       JWTConfig
 	CSRF      CSRFConfig
 	MPesa     MPesaConfig
@@ -27,15 +26,9 @@ type AppConfig struct {
 	BaseURL   string
 }
 
-type DBConfig struct {
-	Host         string
-	Port         string
-	User         string
-	Password     string
-	Name         string
-	SSLMode      string
-	MaxOpenConns int
-	MaxIdleConns int
+type MongoConfig struct {
+	URI    string
+	DBName string
 }
 
 type JWTConfig struct {
@@ -57,22 +50,20 @@ type MPesaConfig struct {
 }
 
 type EmailConfig struct {
-	// Google Workspace — use smtp.gmail.com:587 with an App Password
 	SMTPHost     string
 	SMTPPort     int
-	SMTPUser     string // Google Workspace email address
-	SMTPPassword string // Google Workspace App Password (not account password)
+	SMTPUser     string
+	SMTPPassword string
 	FromAddress  string
 	FromName     string
 }
 
 // CelcomConfig holds Celcom Africa SMS API credentials.
-// Docs: https://developers.celcomafrica.com
 type CelcomConfig struct {
 	APIKey    string
 	PartnerID string
 	Shortcode string
-	BaseURL   string // defaults to https://sms.celcomafrica.com/api/services/sendsms/
+	BaseURL   string
 }
 
 type RateLimitConfig struct {
@@ -86,7 +77,6 @@ type LogConfig struct {
 }
 
 func Load() (*Config, error) {
-	// Load .env file if it exists (ignore error in production)
 	_ = godotenv.Load()
 
 	cfg := &Config{}
@@ -98,17 +88,9 @@ func Load() (*Config, error) {
 		BaseURL:   getEnv("APP_BASE_URL", "http://localhost:8080"),
 	}
 
-	maxOpen, _ := strconv.Atoi(getEnv("DB_MAX_OPEN_CONNS", "25"))
-	maxIdle, _ := strconv.Atoi(getEnv("DB_MAX_IDLE_CONNS", "5"))
-	cfg.DB = DBConfig{
-		Host:         getEnv("DB_HOST", "localhost"),
-		Port:         getEnv("DB_PORT", "5432"),
-		User:         mustGetEnv("DB_USER"),
-		Password:     mustGetEnv("DB_PASSWORD"),
-		Name:         mustGetEnv("DB_NAME"),
-		SSLMode:      getEnv("DB_SSLMODE", "disable"),
-		MaxOpenConns: maxOpen,
-		MaxIdleConns: maxIdle,
+	cfg.Mongo = MongoConfig{
+		URI:    getEnv("MONGODB_URI", "mongodb://localhost:27017"),
+		DBName: getEnv("MONGODB_DB_NAME", "kiosk_db"),
 	}
 
 	jwtExpiry, _ := strconv.Atoi(getEnv("JWT_EXPIRY_HOURS", "24"))
@@ -160,16 +142,6 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
-func (c *DBConfig) DSN() string {
-	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		c.Host, c.Port, c.User, c.Password, c.Name, c.SSLMode)
-}
-
-func (c *DBConfig) URL() string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		c.User, c.Password, c.Host, c.Port, c.Name, c.SSLMode)
-}
-
 func getEnv(key, defaultVal string) string {
 	if val := os.Getenv(key); val != "" {
 		return val
@@ -178,10 +150,5 @@ func getEnv(key, defaultVal string) string {
 }
 
 func mustGetEnv(key string) string {
-	val := os.Getenv(key)
-	if val == "" {
-		// In test environments, return empty string to avoid panic
-		return ""
-	}
-	return val
+	return os.Getenv(key)
 }

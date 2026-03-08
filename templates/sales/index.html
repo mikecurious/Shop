@@ -54,7 +54,7 @@
         <tbody class="divide-y divide-gray-50">
           {{range .sales}}
           <tr class="hover:bg-gray-50">
-            <td class="px-5 py-3 font-mono text-xs text-gray-500">{{slice .ID.String 0 8}}</td>
+            <td class="px-5 py-3 font-mono text-xs text-gray-500">{{slice .ID 0 8}}</td>
             <td class="px-5 py-3 text-gray-600">{{fmtDateTime .CreatedAt}}</td>
             <td class="px-5 py-3 text-gray-700">{{if .CustomerName}}{{.CustomerName}}{{else}}<span class="text-gray-400">—</span>{{end}}</td>
             <td class="px-5 py-3 text-right text-gray-600">KES {{printf "%.2f" .TotalAmount}}</td>

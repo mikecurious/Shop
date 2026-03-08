@@ -38,13 +38,9 @@ func main() {
 	level, _ := zerolog.ParseLevel(cfg.Log.Level)
 	zerolog.SetGlobalLevel(level)
 
-	db, err := repository.NewDB(&cfg.DB)
+	db, err := repository.NewDB(&cfg.Mongo)
 	if err != nil {
 		log.Fatal().Err(err).Msg("database connection failed")
-	}
-
-	if err := repository.RunMigrations(db.DB, "migrations"); err != nil {
-		log.Fatal().Err(err).Msg("migrations failed")
 	}
 
 	// Repositories

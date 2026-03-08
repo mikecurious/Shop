@@ -24,7 +24,7 @@
       <p class="text-xl font-bold text-gray-900">KIOSK MANAGER</p>
       <p class="text-gray-500 text-xs mt-1">Official Receipt</p>
       <p class="text-gray-400 text-xs">{{fmtDateTime .CreatedAt}}</p>
-      <p class="text-gray-400 text-xs mt-1">Receipt #: {{slice .ID.String 0 8 | printf "%s" | printf "%s" }}</p>
+      <p class="text-gray-400 text-xs mt-1">Receipt #: {{slice .ID 0 8}}</p>
     </div>
 
     <!-- Customer -->

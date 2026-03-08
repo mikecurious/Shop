@@ -7,130 +7,103 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/michaelbrian/kiosk/internal/models"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type SaleRepository struct {
-	db *DB
+	col     *mongo.Collection
+	prodCol *mongo.Collection
+	userCol *mongo.Collection
 }
 
 func NewSaleRepository(db *DB) *SaleRepository {
-	return &SaleRepository{db: db}
-}
-
-func (r *SaleRepository) Create(ctx context.Context, sale *models.Sale) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
+	return &SaleRepository{
+		col:     db.Collection("sales"),
+		prodCol: db.Collection("products"),
+		userCol: db.Collection("users"),
 	}
-	defer tx.Rollback()
-
-	sale.ID = uuid.New()
-	sale.CreatedAt = time.Now()
-
-	_, err = tx.ExecContext(ctx, `
-		INSERT INTO sales (id, total_amount, discount_type, discount_value, discount_amount,
-		    net_amount, payment_method, payment_reference, customer_name, customer_phone,
-		    notes, created_by, created_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-	`, sale.ID, sale.TotalAmount, sale.DiscountType, sale.DiscountValue, sale.DiscountAmount,
-		sale.NetAmount, sale.PaymentMethod, sale.PaymentReference,
-		sale.CustomerName, sale.CustomerPhone, sale.Notes, sale.CreatedBy, sale.CreatedAt)
-	if err != nil {
-		return fmt.Errorf("insert sale: %w", err)
-	}
-
-	for i := range sale.Items {
-		item := &sale.Items[i]
-		item.ID = uuid.New()
-		item.SaleID = sale.ID
-		_, err = tx.ExecContext(ctx, `
-			INSERT INTO sale_items (id, sale_id, product_id, quantity, unit_price, buying_price, subtotal)
-			VALUES ($1,$2,$3,$4,$5,$6,$7)
-		`, item.ID, item.SaleID, item.ProductID, item.Quantity,
-			item.UnitPrice, item.BuyingPrice, item.Subtotal)
-		if err != nil {
-			return fmt.Errorf("insert sale item: %w", err)
-		}
-
-		// Decrement stock
-		_, err = tx.ExecContext(ctx,
-			`UPDATE products SET quantity = quantity - $1, updated_at = NOW() WHERE id = $2`,
-			item.Quantity, item.ProductID)
-		if err != nil {
-			return fmt.Errorf("update stock: %w", err)
-		}
-
-		// Record stock movement
-		_, err = tx.ExecContext(ctx, `
-			INSERT INTO stock_movements (id, product_id, type, quantity, reference, notes, created_by, created_at)
-			VALUES ($1,$2,'out',$3,$4,'Sale transaction',$5,$6)
-		`, uuid.New(), item.ProductID, item.Quantity,
-			fmt.Sprintf("SALE-%s", sale.ID.String()[:8]),
-			sale.CreatedBy, sale.CreatedAt)
-		if err != nil {
-			return fmt.Errorf("insert stock movement: %w", err)
-		}
-	}
-
-	return tx.Commit()
-}
-
-func (r *SaleRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Sale, error) {
-	row := r.db.QueryRowContext(ctx, `
-		SELECT s.id, s.total_amount, s.discount_type, s.discount_value, s.discount_amount,
-		       s.net_amount, s.payment_method, s.payment_reference,
-		       s.customer_name, s.customer_phone, s.notes,
-		       s.created_by, COALESCE(u.name,'') as created_by_name, s.created_at
-		FROM sales s
-		LEFT JOIN users u ON u.id = s.created_by
-		WHERE s.id = $1
-	`, id)
-
-	sale := &models.Sale{}
-	err := row.Scan(
-		&sale.ID, &sale.TotalAmount, &sale.DiscountType, &sale.DiscountValue, &sale.DiscountAmount,
-		&sale.NetAmount, &sale.PaymentMethod, &sale.PaymentReference,
-		&sale.CustomerName, &sale.CustomerPhone, &sale.Notes,
-		&sale.CreatedBy, &sale.CreatedByName, &sale.CreatedAt,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	// Load items
-	rows, err := r.db.QueryContext(ctx, `
-		SELECT si.id, si.sale_id, si.product_id, COALESCE(p.name,'') as product_name,
-		       COALESCE(p.sku,'') as product_sku,
-		       si.quantity, si.unit_price, si.buying_price, si.subtotal
-		FROM sale_items si
-		LEFT JOIN products p ON p.id = si.product_id
-		WHERE si.sale_id = $1
-	`, id)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var item models.SaleItem
-		if err := rows.Scan(
-			&item.ID, &item.SaleID, &item.ProductID, &item.ProductName, &item.ProductSKU,
-			&item.Quantity, &item.UnitPrice, &item.BuyingPrice, &item.Subtotal,
-		); err != nil {
-			return nil, err
-		}
-		sale.Items = append(sale.Items, item)
-	}
-	return sale, rows.Err()
 }
 
 type SaleFilter struct {
 	From          time.Time
 	To            time.Time
 	PaymentMethod string
-	CreatedBy     *uuid.UUID
+	CreatedBy     *string
 	Page          int
 	Limit         int
+}
+
+func (r *SaleRepository) Create(ctx context.Context, sale *models.Sale) error {
+	sale.ID = uuid.New().String()
+	sale.CreatedAt = time.Now()
+
+	// Compute TotalCOGS and assign IDs to items
+	var totalCOGS float64
+	for i := range sale.Items {
+		item := &sale.Items[i]
+		item.ID = uuid.New().String()
+		item.SaleID = sale.ID
+		totalCOGS += item.BuyingPrice * float64(item.Quantity)
+	}
+	sale.TotalCOGS = totalCOGS
+
+	// Populate creator name
+	user := &models.User{}
+	if err := r.userCol.FindOne(ctx, bson.M{"_id": sale.CreatedBy}).Decode(user); err == nil {
+		sale.CreatedByName = user.Name
+	}
+
+	// Insert sale with embedded items
+	if _, err := r.col.InsertOne(ctx, sale); err != nil {
+		return fmt.Errorf("insert sale: %w", err)
+	}
+
+	// Decrement stock and record movements (best-effort, no distributed tx)
+	for _, item := range sale.Items {
+		_, _ = r.prodCol.UpdateOne(ctx,
+			bson.M{"_id": item.ProductID},
+			bson.M{
+				"$inc": bson.M{"quantity": -item.Quantity},
+				"$set": bson.M{"updated_at": sale.CreatedAt},
+			},
+		)
+
+		movement := models.StockMovement{
+			ID:        uuid.New().String(),
+			ProductID: item.ProductID,
+			Type:      models.StockOut,
+			Quantity:  item.Quantity,
+			Reference: fmt.Sprintf("SALE-%s", sale.ID[:8]),
+			Notes:     "Sale transaction",
+			CreatedBy: sale.CreatedBy,
+			CreatedAt: sale.CreatedAt,
+		}
+		db := r.col.Database()
+		_, _ = db.Collection("stock_movements").InsertOne(ctx, movement)
+	}
+
+	return nil
+}
+
+func (r *SaleRepository) GetByID(ctx context.Context, id string) (*models.Sale, error) {
+	sale := &models.Sale{}
+	if err := r.col.FindOne(ctx, bson.M{"_id": id}).Decode(sale); err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get sale: %w", err)
+	}
+
+	// Populate creator name if missing
+	if sale.CreatedByName == "" {
+		user := &models.User{}
+		if err := r.userCol.FindOne(ctx, bson.M{"_id": sale.CreatedBy}).Decode(user); err == nil {
+			sale.CreatedByName = user.Name
+		}
+	}
+	return sale, nil
 }
 
 func (r *SaleRepository) List(ctx context.Context, f SaleFilter) ([]*models.Sale, int, error) {
@@ -141,201 +114,230 @@ func (r *SaleRepository) List(ctx context.Context, f SaleFilter) ([]*models.Sale
 		f.Page = 1
 	}
 
-	args := []any{}
-	conditions := []string{}
-	argIdx := 1
-
-	if !f.From.IsZero() {
-		conditions = append(conditions, fmt.Sprintf("s.created_at >= $%d", argIdx))
-		args = append(args, f.From)
-		argIdx++
-	}
-	if !f.To.IsZero() {
-		conditions = append(conditions, fmt.Sprintf("s.created_at <= $%d", argIdx))
-		args = append(args, f.To)
-		argIdx++
+	filter := bson.M{}
+	if !f.From.IsZero() || !f.To.IsZero() {
+		dateRange := bson.M{}
+		if !f.From.IsZero() {
+			dateRange["$gte"] = f.From
+		}
+		if !f.To.IsZero() {
+			dateRange["$lte"] = f.To
+		}
+		filter["created_at"] = dateRange
 	}
 	if f.PaymentMethod != "" {
-		conditions = append(conditions, fmt.Sprintf("s.payment_method = $%d", argIdx))
-		args = append(args, f.PaymentMethod)
-		argIdx++
+		filter["payment_method"] = f.PaymentMethod
 	}
 	if f.CreatedBy != nil {
-		conditions = append(conditions, fmt.Sprintf("s.created_by = $%d", argIdx))
-		args = append(args, *f.CreatedBy)
-		argIdx++
+		filter["created_by"] = *f.CreatedBy
 	}
 
-	where := ""
-	if len(conditions) > 0 {
-		where = "WHERE " + joinConditions(conditions)
-	}
-
-	var total int
-	if err := r.db.QueryRowContext(ctx,
-		fmt.Sprintf("SELECT COUNT(*) FROM sales s %s", where), args...).Scan(&total); err != nil {
-		return nil, 0, err
-	}
-
-	rows, err := r.db.QueryContext(ctx, fmt.Sprintf(`
-		SELECT s.id, s.total_amount, s.discount_type, s.discount_value, s.discount_amount,
-		       s.net_amount, s.payment_method, s.payment_reference,
-		       s.customer_name, s.customer_phone, s.notes,
-		       s.created_by, COALESCE(u.name,'') as created_by_name, s.created_at
-		FROM sales s
-		LEFT JOIN users u ON u.id = s.created_by
-		%s
-		ORDER BY s.created_at DESC
-		LIMIT $%d OFFSET $%d
-	`, where, argIdx, argIdx+1), append(args, f.Limit, (f.Page-1)*f.Limit)...)
+	total64, err := r.col.CountDocuments(ctx, filter)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("count sales: %w", err)
 	}
-	defer rows.Close()
+
+	opts := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetLimit(int64(f.Limit)).
+		SetSkip(int64((f.Page - 1) * f.Limit))
+
+	cursor, err := r.col.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list sales: %w", err)
+	}
+	defer cursor.Close(ctx)
 
 	var sales []*models.Sale
-	for rows.Next() {
-		s := &models.Sale{}
-		if err := rows.Scan(
-			&s.ID, &s.TotalAmount, &s.DiscountType, &s.DiscountValue, &s.DiscountAmount,
-			&s.NetAmount, &s.PaymentMethod, &s.PaymentReference,
-			&s.CustomerName, &s.CustomerPhone, &s.Notes,
-			&s.CreatedBy, &s.CreatedByName, &s.CreatedAt,
-		); err != nil {
-			return nil, 0, err
-		}
-		sales = append(sales, s)
+	if err := cursor.All(ctx, &sales); err != nil {
+		return nil, 0, fmt.Errorf("decode sales: %w", err)
 	}
-	return sales, total, rows.Err()
+	return sales, int(total64), nil
 }
 
 func (r *SaleRepository) GetDashboardStats(ctx context.Context) (*models.DashboardStats, error) {
 	stats := &models.DashboardStats{}
 
-	// All-time revenue, COGS, gross profit
-	err := r.db.QueryRowContext(ctx, `
-		SELECT
-		    COALESCE(SUM(s.net_amount), 0) AS total_revenue,
-		    COALESCE(SUM(si.buying_price * si.quantity), 0) AS total_cogs,
-		    COUNT(DISTINCT s.id) AS total_sales
-		FROM sales s
-		JOIN sale_items si ON si.sale_id = s.id
-	`).Scan(&stats.TotalRevenue, &stats.TotalCOGS, &stats.TotalSales)
-	if err != nil {
-		return nil, err
+	// All-time totals
+	allTimePipeline := mongo.Pipeline{
+		{{Key: "$group", Value: bson.M{
+			"_id":     nil,
+			"count":   bson.M{"$sum": 1},
+			"revenue": bson.M{"$sum": "$net_amount"},
+			"cogs":    bson.M{"$sum": "$total_cogs"},
+		}}},
+	}
+	cursor, err := r.col.Aggregate(ctx, allTimePipeline)
+	if err == nil {
+		defer cursor.Close(ctx)
+		var results []struct {
+			Count   int     `bson:"count"`
+			Revenue float64 `bson:"revenue"`
+			COGS    float64 `bson:"cogs"`
+		}
+		if cursor.All(ctx, &results) == nil && len(results) > 0 {
+			stats.TotalSales = results[0].Count
+			stats.TotalRevenue = results[0].Revenue
+			stats.TotalCOGS = results[0].COGS
+		}
 	}
 	stats.GrossProfit = stats.TotalRevenue - stats.TotalCOGS
 	if stats.TotalRevenue > 0 {
 		stats.GrossMargin = (stats.GrossProfit / stats.TotalRevenue) * 100
 	}
 
-	// Today
-	today := time.Now().Truncate(24 * time.Hour)
-	err = r.db.QueryRowContext(ctx, `
-		SELECT COALESCE(SUM(net_amount),0), COUNT(*) FROM sales
-		WHERE created_at >= $1
-	`, today).Scan(&stats.TodayRevenue, &stats.TodaySales)
-	if err != nil {
-		return nil, err
+	// Today's stats
+	now := time.Now()
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	todayPipeline := mongo.Pipeline{
+		{{Key: "$match", Value: bson.M{"created_at": bson.M{"$gte": startOfDay}}}},
+		{{Key: "$group", Value: bson.M{
+			"_id":     nil,
+			"count":   bson.M{"$sum": 1},
+			"revenue": bson.M{"$sum": "$net_amount"},
+		}}},
+	}
+	cursor2, err := r.col.Aggregate(ctx, todayPipeline)
+	if err == nil {
+		defer cursor2.Close(ctx)
+		var todayResults []struct {
+			Count   int     `bson:"count"`
+			Revenue float64 `bson:"revenue"`
+		}
+		if cursor2.All(ctx, &todayResults) == nil && len(todayResults) > 0 {
+			stats.TodaySales = todayResults[0].Count
+			stats.TodayRevenue = todayResults[0].Revenue
+		}
 	}
 
-	// Low stock
-	err = r.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM products WHERE quantity <= reorder_level AND is_active = TRUE`,
-	).Scan(&stats.LowStockCount)
-	if err != nil {
-		return nil, err
-	}
+	// Low stock count
+	lowStockCount, _ := r.prodCol.CountDocuments(ctx, bson.M{
+		"is_active": true,
+		"$expr":     bson.M{"$lte": bson.A{"$quantity", "$reorder_level"}},
+	})
+	stats.LowStockCount = int(lowStockCount)
 
 	return stats, nil
 }
 
 func (r *SaleRepository) GetPLSummary(ctx context.Context, from, to time.Time, groupBy string) ([]models.PLSummary, error) {
-	var dateTrunc string
+	var dateFormat string
 	switch groupBy {
 	case "week":
-		dateTrunc = "week"
+		dateFormat = "%G-W%V"
 	case "month":
-		dateTrunc = "month"
+		dateFormat = "%Y-%m"
 	default:
-		dateTrunc = "day"
+		dateFormat = "%Y-%m-%d"
 	}
 
-	rows, err := r.db.QueryContext(ctx, fmt.Sprintf(`
-		SELECT
-		    TO_CHAR(DATE_TRUNC('%s', s.created_at), 'YYYY-MM-DD') as period,
-		    COALESCE(SUM(s.net_amount), 0) as revenue,
-		    COALESCE(SUM(si.buying_price * si.quantity), 0) as cogs,
-		    COUNT(DISTINCT s.id) as sale_count
-		FROM sales s
-		JOIN sale_items si ON si.sale_id = s.id
-		WHERE s.created_at BETWEEN $1 AND $2
-		GROUP BY DATE_TRUNC('%s', s.created_at)
-		ORDER BY period ASC
-	`, dateTrunc, dateTrunc), from, to)
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: bson.M{"created_at": bson.M{"$gte": from, "$lte": to}}}},
+		{{Key: "$group", Value: bson.M{
+			"_id": bson.M{"$dateToString": bson.M{
+				"format": dateFormat,
+				"date":   "$created_at",
+			}},
+			"revenue":    bson.M{"$sum": "$net_amount"},
+			"cogs":       bson.M{"$sum": "$total_cogs"},
+			"sale_count": bson.M{"$sum": 1},
+		}}},
+		{{Key: "$sort", Value: bson.D{{Key: "_id", Value: 1}}}},
+	}
+
+	cursor, err := r.col.Aggregate(ctx, pipeline)
 	if err != nil {
+		return nil, fmt.Errorf("pl summary aggregate: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var raw []struct {
+		ID        string  `bson:"_id"`
+		Revenue   float64 `bson:"revenue"`
+		COGS      float64 `bson:"cogs"`
+		SaleCount int     `bson:"sale_count"`
+	}
+	if err := cursor.All(ctx, &raw); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var result []models.PLSummary
-	for rows.Next() {
-		var p models.PLSummary
-		if err := rows.Scan(&p.Period, &p.Revenue, &p.COGS, &p.SaleCount); err != nil {
-			return nil, err
+	result := make([]models.PLSummary, 0, len(raw))
+	for _, r := range raw {
+		gp := r.Revenue - r.COGS
+		margin := 0.0
+		if r.Revenue > 0 {
+			margin = (gp / r.Revenue) * 100
 		}
-		p.GrossProfit = p.Revenue - p.COGS
-		if p.Revenue > 0 {
-			p.Margin = (p.GrossProfit / p.Revenue) * 100
-		}
-		result = append(result, p)
+		result = append(result, models.PLSummary{
+			Period:      r.ID,
+			Revenue:     r.Revenue,
+			COGS:        r.COGS,
+			GrossProfit: gp,
+			Margin:      margin,
+			SaleCount:   r.SaleCount,
+		})
 	}
-	return result, rows.Err()
+	return result, nil
 }
 
 func (r *SaleRepository) GetTopProducts(ctx context.Context, from, to time.Time, limit int) ([]models.TopProduct, error) {
 	if limit == 0 {
 		limit = 10
 	}
-	rows, err := r.db.QueryContext(ctx, `
-		SELECT si.product_id, COALESCE(p.name,'') as product_name, COALESCE(p.sku,'') as sku,
-		       SUM(si.quantity) as total_qty,
-		       SUM(si.subtotal) as total_revenue,
-		       CASE WHEN SUM(si.subtotal) > 0
-		            THEN (SUM(si.subtotal) - SUM(si.buying_price * si.quantity)) / SUM(si.subtotal) * 100
-		            ELSE 0 END as margin
-		FROM sale_items si
-		LEFT JOIN products p ON p.id = si.product_id
-		LEFT JOIN sales s ON s.id = si.sale_id
-		WHERE s.created_at BETWEEN $1 AND $2
-		GROUP BY si.product_id, p.name, p.sku
-		ORDER BY total_revenue DESC
-		LIMIT $3
-	`, from, to, limit)
+
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: bson.M{"created_at": bson.M{"$gte": from, "$lte": to}}}},
+		{{Key: "$unwind", Value: "$items"}},
+		{{Key: "$group", Value: bson.M{
+			"_id": bson.M{
+				"product_id":   "$items.product_id",
+				"product_name": "$items.product_name",
+				"product_sku":  "$items.product_sku",
+			},
+			"total_qty":     bson.M{"$sum": "$items.quantity"},
+			"total_revenue": bson.M{"$sum": "$items.subtotal"},
+			"total_cogs": bson.M{"$sum": bson.M{
+				"$multiply": bson.A{"$items.buying_price", "$items.quantity"},
+			}},
+		}}},
+		{{Key: "$sort", Value: bson.D{{Key: "total_revenue", Value: -1}}}},
+		{{Key: "$limit", Value: limit}},
+	}
+
+	cursor, err := r.col.Aggregate(ctx, pipeline)
 	if err != nil {
+		return nil, fmt.Errorf("top products aggregate: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var raw []struct {
+		ID struct {
+			ProductID   string `bson:"product_id"`
+			ProductName string `bson:"product_name"`
+			ProductSKU  string `bson:"product_sku"`
+		} `bson:"_id"`
+		TotalQty     int     `bson:"total_qty"`
+		TotalRevenue float64 `bson:"total_revenue"`
+		TotalCOGS    float64 `bson:"total_cogs"`
+	}
+	if err := cursor.All(ctx, &raw); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var result []models.TopProduct
-	for rows.Next() {
-		var tp models.TopProduct
-		if err := rows.Scan(&tp.ProductID, &tp.ProductName, &tp.SKU,
-			&tp.TotalQty, &tp.TotalRevenue, &tp.Margin); err != nil {
-			return nil, err
+	result := make([]models.TopProduct, 0, len(raw))
+	for _, r := range raw {
+		margin := 0.0
+		if r.TotalRevenue > 0 {
+			margin = ((r.TotalRevenue - r.TotalCOGS) / r.TotalRevenue) * 100
 		}
-		result = append(result, tp)
+		result = append(result, models.TopProduct{
+			ProductID:    r.ID.ProductID,
+			ProductName:  r.ID.ProductName,
+			SKU:          r.ID.ProductSKU,
+			TotalQty:     r.TotalQty,
+			TotalRevenue: r.TotalRevenue,
+			Margin:       margin,
+		})
 	}
-	return result, rows.Err()
-}
-
-func joinConditions(conds []string) string {
-	result := ""
-	for i, c := range conds {
-		if i > 0 {
-			result += " AND "
-		}
-		result += c
-	}
-	return result
+	return result, nil
 }

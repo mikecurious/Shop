@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"github.com/michaelbrian/kiosk/internal/config"
 	"github.com/michaelbrian/kiosk/internal/models"
 	"github.com/michaelbrian/kiosk/internal/repository"
@@ -113,7 +112,7 @@ func (s *AuthService) ValidateToken(tokenStr string) (*models.Claims, error) {
 	return claims, nil
 }
 
-func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, oldPass, newPass string) error {
+func (s *AuthService) ChangePassword(ctx context.Context, userID string, oldPass, newPass string) error {
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil || user == nil {
 		return ErrUserNotFound
@@ -131,7 +130,7 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, oldP
 	return s.userRepo.UpdatePassword(ctx, userID, string(hash))
 }
 
-func (s *AuthService) GetUser(ctx context.Context, id uuid.UUID) (*models.User, error) {
+func (s *AuthService) GetUser(ctx context.Context, id string) (*models.User, error) {
 	return s.userRepo.GetByID(ctx, id)
 }
 
@@ -146,7 +145,7 @@ func (s *AuthService) UpdateUser(ctx context.Context, user *models.User) error {
 func (s *AuthService) generateToken(user *models.User) (string, error) {
 	expiry := time.Duration(s.cfg.JWT.ExpiryHours) * time.Hour
 	claims := jwt.MapClaims{
-		"user_id": user.ID.String(),
+		"user_id": user.ID,
 		"email":   user.Email,
 		"role":    string(user.Role),
 		"name":    user.Name,

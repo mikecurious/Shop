@@ -38,13 +38,11 @@ func NewProductService(
 	}
 }
 
-func (s *ProductService) Create(ctx context.Context, req models.CreateProductRequest, createdBy uuid.UUID) (*models.Product, error) {
-	// Auto-generate SKU if empty
+func (s *ProductService) Create(ctx context.Context, req models.CreateProductRequest, createdBy string) (*models.Product, error) {
 	if req.SKU == "" {
 		req.SKU = generateSKU(req.Name)
 	}
 
-	// Ensure SKU uniqueness
 	exists, err := s.productRepo.SKUExists(ctx, req.SKU, nil)
 	if err != nil {
 		return nil, err
@@ -53,7 +51,6 @@ func (s *ProductService) Create(ctx context.Context, req models.CreateProductReq
 		req.SKU = req.SKU + "-" + uuid.New().String()[:4]
 	}
 
-	// Generate barcode
 	bc, err := barcode.Generate()
 	if err != nil {
 		return nil, fmt.Errorf("generate barcode: %w", err)
@@ -77,7 +74,6 @@ func (s *ProductService) Create(ctx context.Context, req models.CreateProductReq
 		return nil, err
 	}
 
-	// Record initial stock if quantity > 0
 	if req.Quantity > 0 {
 		_ = s.stockRepo.Create(ctx, &models.StockMovement{
 			ProductID: p.ID,
@@ -92,7 +88,7 @@ func (s *ProductService) Create(ctx context.Context, req models.CreateProductReq
 	return p, nil
 }
 
-func (s *ProductService) GetByID(ctx context.Context, id uuid.UUID) (*models.Product, error) {
+func (s *ProductService) GetByID(ctx context.Context, id string) (*models.Product, error) {
 	p, err := s.productRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -111,7 +107,7 @@ func (s *ProductService) List(ctx context.Context, f repository.ProductFilter) (
 	return s.productRepo.List(ctx, f)
 }
 
-func (s *ProductService) Update(ctx context.Context, id uuid.UUID, req models.UpdateProductRequest) (*models.Product, error) {
+func (s *ProductService) Update(ctx context.Context, id string, req models.UpdateProductRequest) (*models.Product, error) {
 	p, err := s.productRepo.GetByID(ctx, id)
 	if err != nil || p == nil {
 		return nil, ErrProductNotFound
@@ -148,11 +144,11 @@ func (s *ProductService) Update(ctx context.Context, id uuid.UUID, req models.Up
 	return p, nil
 }
 
-func (s *ProductService) Delete(ctx context.Context, id uuid.UUID) error {
+func (s *ProductService) Delete(ctx context.Context, id string) error {
 	return s.productRepo.Delete(ctx, id)
 }
 
-func (s *ProductService) AdjustStock(ctx context.Context, req models.StockMovementRequest, createdBy uuid.UUID) error {
+func (s *ProductService) AdjustStock(ctx context.Context, req models.StockMovementRequest, createdBy string) error {
 	p, err := s.productRepo.GetByID(ctx, req.ProductID)
 	if err != nil || p == nil {
 		return ErrProductNotFound
@@ -168,7 +164,7 @@ func (s *ProductService) AdjustStock(ctx context.Context, req models.StockMoveme
 		}
 		delta = -req.Quantity
 	case models.StockAdjustment:
-		delta = req.Quantity - p.Quantity // Set absolute
+		delta = req.Quantity - p.Quantity
 	}
 
 	if err := s.productRepo.UpdateQuantity(ctx, req.ProductID, delta); err != nil {
@@ -189,11 +185,10 @@ func (s *ProductService) GetLowStock(ctx context.Context) ([]*models.Product, er
 	return s.productRepo.GetLowStock(ctx)
 }
 
-func (s *ProductService) ImportCSV(ctx context.Context, r io.Reader, createdBy uuid.UUID) (int, []string, error) {
+func (s *ProductService) ImportCSV(ctx context.Context, r io.Reader, createdBy string) (int, []string, error) {
 	reader := csv.NewReader(r)
 	reader.TrimLeadingSpace = true
 
-	// Skip header
 	if _, err := reader.Read(); err != nil {
 		return 0, nil, fmt.Errorf("read header: %w", err)
 	}
@@ -229,13 +224,13 @@ func (s *ProductService) ImportCSV(ctx context.Context, r io.Reader, createdBy u
 		}
 
 		req := models.CreateProductRequest{
-			Name:          strings.TrimSpace(record[0]),
-			Description:   strings.TrimSpace(record[1]),
-			SKU:           strings.TrimSpace(record[2]),
-			BuyingPrice:   buyingPrice,
-			SellingPrice:  sellingPrice,
-			Quantity:      quantity,
-			ReorderLevel:  reorderLevel,
+			Name:         strings.TrimSpace(record[0]),
+			Description:  strings.TrimSpace(record[1]),
+			SKU:          strings.TrimSpace(record[2]),
+			BuyingPrice:  buyingPrice,
+			SellingPrice: sellingPrice,
+			Quantity:     quantity,
+			ReorderLevel: reorderLevel,
 		}
 		if len(record) > 8 {
 			req.SupplierName = strings.TrimSpace(record[8])

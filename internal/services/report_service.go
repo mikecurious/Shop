@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jung-kurt/gofpdf"
 	"github.com/michaelbrian/kiosk/internal/models"
 	"github.com/michaelbrian/kiosk/internal/repository"
@@ -30,7 +29,11 @@ func (s *ReportService) GenerateReceiptPDF(sale *models.Sale) ([]byte, error) {
 	pdf.CellFormat(0, 10, "KIOSK MANAGER", "", 1, "C", false, 0, "")
 	pdf.SetFont("Arial", "", 10)
 	pdf.CellFormat(0, 6, fmt.Sprintf("Date: %s", sale.CreatedAt.Format("2006-01-02 15:04")), "", 1, "C", false, 0, "")
-	pdf.CellFormat(0, 6, fmt.Sprintf("Receipt: %s", sale.ID.String()[:8]), "", 1, "C", false, 0, "")
+	receiptRef := sale.ID
+	if len(receiptRef) > 8 {
+		receiptRef = receiptRef[:8]
+	}
+	pdf.CellFormat(0, 6, fmt.Sprintf("Receipt: %s", receiptRef), "", 1, "C", false, 0, "")
 	pdf.Ln(3)
 
 	// Items table header
@@ -92,7 +95,7 @@ func (s *ReportService) ExportSalesCSV(ctx context.Context, from, to time.Time) 
 	_ = w.Write([]string{"Sale ID", "Date", "Customer", "Total", "Discount", "Net Amount", "Payment Method", "Created By"})
 	for _, s := range sales {
 		_ = w.Write([]string{
-			s.ID.String(),
+			s.ID,
 			s.CreatedAt.Format("2006-01-02 15:04:05"),
 			s.CustomerName,
 			fmt.Sprintf("%.2f", s.TotalAmount),
@@ -232,7 +235,7 @@ func (s *ReportService) GeneratePLPDF(ctx context.Context, from, to time.Time) (
 // GetStockHistory wraps stock repo
 type StockMovement = models.StockMovement
 
-func (s *ReportService) GetStockHistory(ctx context.Context, productID uuid.UUID, page, limit int) ([]*models.StockMovement, int, error) {
+func (s *ReportService) GetStockHistory(ctx context.Context, productID string, page, limit int) ([]*models.StockMovement, int, error) {
 	_ = ctx
 	return nil, 0, nil // Placeholder - stock repo used in product service
 }

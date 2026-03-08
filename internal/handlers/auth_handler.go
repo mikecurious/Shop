@@ -111,8 +111,7 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	userID := mustParseUUID(claims.UserID)
-	if err := h.authSvc.ChangePassword(c.Request.Context(), userID, form.OldPassword, form.NewPassword); err != nil {
+	if err := h.authSvc.ChangePassword(c.Request.Context(), claims.UserID, form.OldPassword, form.NewPassword); err != nil {
 		c.HTML(http.StatusBadRequest, "auth/profile.html", gin.H{
 			"title":  "Profile",
 			"claims": claims,

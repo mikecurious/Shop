@@ -1,21 +1,17 @@
 version: '3.9'
 
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: kiosk-postgres
+  mongodb:
+    image: mongo:7
+    container_name: kiosk-mongodb
     restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${DB_USER:-kiosk}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-kiosk_password}
-      POSTGRES_DB: ${DB_NAME:-kiosk_db}
     ports:
-      - "5432:5432"
+      - "27017:27017"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mongo_data:/data/db
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-kiosk} -d ${DB_NAME:-kiosk_db}"]
-      interval: 5s
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
       timeout: 5s
       retries: 5
 
@@ -26,19 +22,17 @@ services:
     container_name: kiosk-app
     restart: unless-stopped
     depends_on:
-      postgres:
+      mongodb:
         condition: service_healthy
     env_file:
       - .env
     environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
+      MONGODB_URI: mongodb://mongodb:27017
     ports:
       - "${APP_PORT:-8080}:8080"
     volumes:
-      - ./migrations:/app/migrations:ro
       - ./templates:/app/templates:ro
       - ./static:/app/static:ro
 
 volumes:
-  postgres_data:
+  mongo_data:

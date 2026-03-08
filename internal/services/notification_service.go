@@ -10,6 +10,9 @@ import (
 	"github.com/michaelbrian/kiosk/internal/repository"
 	"github.com/michaelbrian/kiosk/pkg/notifications"
 	"github.com/rs/zerolog/log"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type NotificationService struct {
@@ -71,9 +74,7 @@ func (s *NotificationService) SendLowStockAlerts(ctx context.Context) error {
 			}
 		}
 
-		// SMS via Celcom Africa — requires user phone on record
 		if s.hasPreference(ctx, user.ID, models.AlertLowStock, models.AlertSMS) {
-			// Phone stored in user profile (future: add phone field to users table)
 			s.logAlert(ctx, user.ID, models.AlertLowStock, models.AlertSMS,
 				fmt.Sprintf("Low stock SMS queued: %d products", len(products)))
 		}
@@ -112,8 +113,7 @@ func (s *NotificationService) SendDailySummary(ctx context.Context, stats *model
 	return nil
 }
 
-// SendSMSAlert sends a plain-text SMS to an arbitrary phone number via Celcom Africa.
-func (s *NotificationService) SendSMSAlert(ctx context.Context, userID uuid.UUID, phone, message string) error {
+func (s *NotificationService) SendSMSAlert(ctx context.Context, userID string, phone, message string) error {
 	if err := s.smsSvc.Send(phone, message); err != nil {
 		return err
 	}
@@ -121,7 +121,6 @@ func (s *NotificationService) SendSMSAlert(ctx context.Context, userID uuid.UUID
 	return nil
 }
 
-// SendPaymentNotification fires email + SMS on successful M-Pesa payment.
 func (s *NotificationService) SendPaymentNotification(ctx context.Context, receipt, phone string, amount float64) {
 	users, _ := s.userRepo.List(ctx)
 	for _, user := range users {
@@ -135,37 +134,43 @@ func (s *NotificationService) SendPaymentNotification(ctx context.Context, recei
 		}
 	}
 
-	// SMS to the customer who paid
 	msg := fmt.Sprintf("Payment of KES %.2f received. Receipt: %s. Thank you!", amount, receipt)
 	if err := s.smsSvc.Send(phone, msg); err != nil {
 		log.Warn().Err(err).Str("phone", phone).Msg("customer SMS failed")
 	}
 }
 
-func (s *NotificationService) hasPreference(ctx context.Context, userID uuid.UUID, alertType models.AlertType, channel models.AlertChannel) bool {
-	var enabled bool
-	err := s.db.QueryRowContext(ctx, `
-		SELECT enabled FROM alert_preferences
-		WHERE user_id = $1 AND alert_type = $2 AND channel = $3
-	`, userID, alertType, channel).Scan(&enabled)
+func (s *NotificationService) hasPreference(ctx context.Context, userID string, alertType models.AlertType, channel models.AlertChannel) bool {
+	var pref models.AlertPreference
+	err := s.db.Collection("alert_preferences").FindOne(ctx, bson.M{
+		"user_id":    userID,
+		"alert_type": alertType,
+		"channel":    channel,
+	}).Decode(&pref)
 	if err != nil {
-		return channel == models.AlertEmail // default: email only
+		return channel == models.AlertEmail
 	}
-	return enabled
+	return pref.Enabled
 }
 
-func (s *NotificationService) logAlert(ctx context.Context, userID uuid.UUID, alertType models.AlertType, channel models.AlertChannel, message string) {
+func (s *NotificationService) logAlert(ctx context.Context, userID string, alertType models.AlertType, channel models.AlertChannel, message string) {
 	now := time.Now()
-	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO alerts (id, user_id, type, channel, message, status, sent_at, created_at)
-		VALUES (uuid_generate_v4(), $1, $2, $3, $4, 'sent', $5, $5)
-	`, userID, alertType, channel, message, now)
-	if err != nil {
+	alert := models.Alert{
+		ID:        uuid.New().String(),
+		UserID:    userID,
+		Type:      alertType,
+		Channel:   channel,
+		Message:   message,
+		Status:    "sent",
+		SentAt:    &now,
+		CreatedAt: now,
+	}
+	if _, err := s.db.Collection("alerts").InsertOne(ctx, alert); err != nil {
 		log.Error().Err(err).Msg("alert log failed")
 	}
 }
 
-func (s *NotificationService) GetAlertHistory(ctx context.Context, userID uuid.UUID, page, limit int) ([]models.Alert, int, error) {
+func (s *NotificationService) GetAlertHistory(ctx context.Context, userID string, page, limit int) ([]models.Alert, int, error) {
 	if limit == 0 {
 		limit = 20
 	}
@@ -173,43 +178,51 @@ func (s *NotificationService) GetAlertHistory(ctx context.Context, userID uuid.U
 		page = 1
 	}
 
-	var total int
-	if err := s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM alerts WHERE user_id = $1`, userID).Scan(&total); err != nil {
-		return nil, 0, err
-	}
+	col := s.db.Collection("alerts")
+	filter := bson.M{"user_id": userID}
 
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, user_id, type, channel, message, status, sent_at, created_at
-		FROM alerts WHERE user_id = $1
-		ORDER BY created_at DESC LIMIT $2 OFFSET $3
-	`, userID, limit, (page-1)*limit)
+	total64, err := col.CountDocuments(ctx, filter)
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
+
+	opts := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetLimit(int64(limit)).
+		SetSkip(int64((page - 1) * limit))
+
+	cursor, err := col.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer cursor.Close(ctx)
 
 	var alerts []models.Alert
-	for rows.Next() {
-		var a models.Alert
-		if err := rows.Scan(&a.ID, &a.UserID, &a.Type, &a.Channel,
-			&a.Message, &a.Status, &a.SentAt, &a.CreatedAt); err != nil {
-			return nil, 0, err
-		}
-		alerts = append(alerts, a)
+	if err := cursor.All(ctx, &alerts); err != nil {
+		return nil, 0, err
 	}
-	return alerts, total, rows.Err()
+	return alerts, int(total64), nil
 }
 
-func (s *NotificationService) UpdatePreferences(ctx context.Context, userID uuid.UUID, prefs []models.AlertPreference) error {
+func (s *NotificationService) UpdatePreferences(ctx context.Context, userID string, prefs []models.AlertPreference) error {
+	col := s.db.Collection("alert_preferences")
 	for _, pref := range prefs {
-		_, err := s.db.ExecContext(ctx, `
-			INSERT INTO alert_preferences (id, user_id, alert_type, channel, enabled)
-			VALUES (uuid_generate_v4(), $1, $2, $3, $4)
-			ON CONFLICT (user_id, alert_type, channel)
-			DO UPDATE SET enabled = EXCLUDED.enabled
-		`, userID, pref.AlertType, pref.Channel, pref.Enabled)
-		if err != nil {
+		filter := bson.M{
+			"user_id":    userID,
+			"alert_type": pref.AlertType,
+			"channel":    pref.Channel,
+		}
+		update := bson.M{
+			"$set": bson.M{"enabled": pref.Enabled},
+			"$setOnInsert": bson.M{
+				"_id":        uuid.New().String(),
+				"user_id":    userID,
+				"alert_type": pref.AlertType,
+				"channel":    pref.Channel,
+			},
+		}
+		_, err := col.UpdateOne(ctx, filter, update, options.UpdateOne().SetUpsert(true))
+		if err != nil && !mongo.IsDuplicateKeyError(err) {
 			return err
 		}
 	}

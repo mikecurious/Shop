@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/michaelbrian/kiosk/internal/middleware"
 	"github.com/michaelbrian/kiosk/internal/models"
 	"github.com/michaelbrian/kiosk/internal/repository"
@@ -38,9 +37,7 @@ func (h *ProductHandler) Index(c *gin.Context) {
 		Limit:    limit,
 	}
 	if catStr != "" {
-		if catID, err := uuid.Parse(catStr); err == nil {
-			filter.CategoryID = &catID
-		}
+		filter.CategoryID = &catStr
 	}
 	active := true
 	filter.IsActive = &active
@@ -122,7 +119,7 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		return
 	}
 
-	createdBy := mustParseUUID(claims.UserID)
+	createdBy := claims.UserID
 	product, err := h.productSvc.Create(c.Request.Context(), req, createdBy)
 	if err != nil {
 		c.HTML(http.StatusBadRequest, "inventory/create.html", gin.H{
@@ -208,7 +205,7 @@ func (h *ProductHandler) AdjustStock(c *gin.Context) {
 		return
 	}
 
-	createdBy := mustParseUUID(claims.UserID)
+	createdBy := claims.UserID
 	if err := h.productSvc.AdjustStock(c.Request.Context(), req, createdBy); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -236,7 +233,7 @@ func (h *ProductHandler) ImportCSV(c *gin.Context) {
 	}
 	defer file.Close()
 
-	createdBy := mustParseUUID(claims.UserID)
+	createdBy := claims.UserID
 	imported, errs, err := h.productSvc.ImportCSV(c.Request.Context(), file, createdBy)
 	if err != nil {
 		renderError(c, err)
@@ -323,7 +320,7 @@ func (h *ProductHandler) APICreate(c *gin.Context) {
 		return
 	}
 
-	product, err := h.productSvc.Create(c.Request.Context(), req, mustParseUUID(claims.UserID))
+	product, err := h.productSvc.Create(c.Request.Context(), req, claims.UserID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

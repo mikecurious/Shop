@@ -6,22 +6,19 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
-func mustParseUUID(s string) uuid.UUID {
-	id, err := uuid.Parse(s)
-	if err != nil {
-		return uuid.Nil
-	}
-	return id
+// mustParseUUID returns the string as-is (IDs are now plain strings).
+func mustParseUUID(s string) string {
+	return s
 }
 
-func parseUUIDParam(c *gin.Context, param string) (uuid.UUID, bool) {
-	id, err := uuid.Parse(c.Param(param))
-	if err != nil {
+// parseUUIDParam extracts a string ID from a URL param and validates it's non-empty.
+func parseUUIDParam(c *gin.Context, param string) (string, bool) {
+	id := c.Param(param)
+	if id == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid ID"})
-		return uuid.Nil, false
+		return "", false
 	}
 	return id, true
 }

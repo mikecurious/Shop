@@ -156,10 +156,7 @@ func (h *MPesaHandler) LinkToSale(c *gin.Context) {
 		return
 	}
 
-	paymentID := mustParseUUID(req.PaymentID)
-	saleID := mustParseUUID(req.SaleID)
-
-	if err := h.paymentRepo.LinkToSale(c.Request.Context(), paymentID, saleID); err != nil {
+	if err := h.paymentRepo.LinkToSale(c.Request.Context(), req.PaymentID, req.SaleID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

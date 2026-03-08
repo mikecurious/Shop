@@ -7,51 +7,45 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/michaelbrian/kiosk/internal/models"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type PaymentRepository struct {
-	db *DB
+	col *mongo.Collection
 }
 
 func NewPaymentRepository(db *DB) *PaymentRepository {
-	return &PaymentRepository{db: db}
+	return &PaymentRepository{col: db.Collection("payments")}
 }
 
 func (r *PaymentRepository) Create(ctx context.Context, p *models.Payment) error {
-	p.ID = uuid.New()
+	p.ID = uuid.New().String()
 	p.CreatedAt = time.Now()
-	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO payments (id, sale_id, mpesa_receipt, phone_number, amount, status,
-		    result_code, result_desc, checkout_request_id, merchant_request_id,
-		    transaction_date, created_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-	`, p.ID, p.SaleID, p.MpesaReceipt, p.PhoneNumber, p.Amount, p.Status,
-		p.ResultCode, p.ResultDesc, p.CheckoutRequestID, p.MerchantRequestID,
-		p.TransactionDate, p.CreatedAt)
+	_, err := r.col.InsertOne(ctx, p)
 	return err
 }
 
 func (r *PaymentRepository) UpdateStatus(ctx context.Context, checkoutID, receipt, resultCode, resultDesc string, status models.PaymentStatus) error {
-	_, err := r.db.ExecContext(ctx, `
-		UPDATE payments SET status = $1, mpesa_receipt = $2, result_code = $3, result_desc = $4
-		WHERE checkout_request_id = $5
-	`, status, receipt, resultCode, resultDesc, checkoutID)
+	_, err := r.col.UpdateOne(ctx,
+		bson.M{"checkout_request_id": checkoutID},
+		bson.M{"$set": bson.M{
+			"status":       status,
+			"mpesa_receipt": receipt,
+			"result_code":  resultCode,
+			"result_desc":  resultDesc,
+		}},
+	)
 	return err
 }
 
 func (r *PaymentRepository) GetByCheckoutID(ctx context.Context, checkoutID string) (*models.Payment, error) {
 	p := &models.Payment{}
-	err := r.db.QueryRowContext(ctx, `
-		SELECT id, sale_id, mpesa_receipt, phone_number, amount, status,
-		       result_code, result_desc, checkout_request_id, merchant_request_id,
-		       transaction_date, created_at
-		FROM payments WHERE checkout_request_id = $1
-	`, checkoutID).Scan(
-		&p.ID, &p.SaleID, &p.MpesaReceipt, &p.PhoneNumber, &p.Amount, &p.Status,
-		&p.ResultCode, &p.ResultDesc, &p.CheckoutRequestID, &p.MerchantRequestID,
-		&p.TransactionDate, &p.CreatedAt,
-	)
-	if err != nil {
+	if err := r.col.FindOne(ctx, bson.M{"checkout_request_id": checkoutID}).Decode(p); err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, fmt.Errorf("payment not found")
+		}
 		return nil, err
 	}
 	return p, nil
@@ -65,67 +59,48 @@ func (r *PaymentRepository) List(ctx context.Context, from, to time.Time, status
 		page = 1
 	}
 
-	args := []any{}
-	conditions := []string{}
-	argIdx := 1
-
-	if !from.IsZero() {
-		conditions = append(conditions, fmt.Sprintf("created_at >= $%d", argIdx))
-		args = append(args, from)
-		argIdx++
-	}
-	if !to.IsZero() {
-		conditions = append(conditions, fmt.Sprintf("created_at <= $%d", argIdx))
-		args = append(args, to)
-		argIdx++
+	filter := bson.M{}
+	if !from.IsZero() || !to.IsZero() {
+		dateRange := bson.M{}
+		if !from.IsZero() {
+			dateRange["$gte"] = from
+		}
+		if !to.IsZero() {
+			dateRange["$lte"] = to
+		}
+		filter["created_at"] = dateRange
 	}
 	if status != "" {
-		conditions = append(conditions, fmt.Sprintf("status = $%d", argIdx))
-		args = append(args, status)
-		argIdx++
+		filter["status"] = status
 	}
 
-	where := ""
-	if len(conditions) > 0 {
-		where = "WHERE " + joinConditions(conditions)
-	}
-
-	var total int
-	if err := r.db.QueryRowContext(ctx,
-		fmt.Sprintf("SELECT COUNT(*) FROM payments %s", where), args...).Scan(&total); err != nil {
-		return nil, 0, err
-	}
-
-	rows, err := r.db.QueryContext(ctx, fmt.Sprintf(`
-		SELECT id, sale_id, mpesa_receipt, phone_number, amount, status,
-		       result_code, result_desc, checkout_request_id, merchant_request_id,
-		       transaction_date, created_at
-		FROM payments %s
-		ORDER BY created_at DESC
-		LIMIT $%d OFFSET $%d
-	`, where, argIdx, argIdx+1), append(args, limit, (page-1)*limit)...)
+	total64, err := r.col.CountDocuments(ctx, filter)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("count payments: %w", err)
 	}
-	defer rows.Close()
+
+	opts := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetLimit(int64(limit)).
+		SetSkip(int64((page - 1) * limit))
+
+	cursor, err := r.col.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list payments: %w", err)
+	}
+	defer cursor.Close(ctx)
 
 	var payments []*models.Payment
-	for rows.Next() {
-		p := &models.Payment{}
-		if err := rows.Scan(
-			&p.ID, &p.SaleID, &p.MpesaReceipt, &p.PhoneNumber, &p.Amount, &p.Status,
-			&p.ResultCode, &p.ResultDesc, &p.CheckoutRequestID, &p.MerchantRequestID,
-			&p.TransactionDate, &p.CreatedAt,
-		); err != nil {
-			return nil, 0, err
-		}
-		payments = append(payments, p)
+	if err := cursor.All(ctx, &payments); err != nil {
+		return nil, 0, fmt.Errorf("decode payments: %w", err)
 	}
-	return payments, total, rows.Err()
+	return payments, int(total64), nil
 }
 
-func (r *PaymentRepository) LinkToSale(ctx context.Context, paymentID, saleID uuid.UUID) error {
-	_, err := r.db.ExecContext(ctx,
-		`UPDATE payments SET sale_id = $1 WHERE id = $2`, saleID, paymentID)
+func (r *PaymentRepository) LinkToSale(ctx context.Context, paymentID, saleID string) error {
+	_, err := r.col.UpdateOne(ctx,
+		bson.M{"_id": paymentID},
+		bson.M{"$set": bson.M{"sale_id": saleID}},
+	)
 	return err
 }

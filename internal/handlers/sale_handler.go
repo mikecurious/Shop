@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/michaelbrian/kiosk/internal/middleware"
 	"github.com/michaelbrian/kiosk/internal/models"
 	"github.com/michaelbrian/kiosk/internal/repository"
@@ -76,8 +75,7 @@ func (h *SaleHandler) CreateSale(c *gin.Context) {
 		return
 	}
 
-	createdBy := mustParseUUID(claims.UserID)
-	sale, err := h.saleSvc.CreateSale(c.Request.Context(), req, createdBy)
+	sale, err := h.saleSvc.CreateSale(c.Request.Context(), req, claims.UserID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -91,9 +89,8 @@ func (h *SaleHandler) CreateSale(c *gin.Context) {
 }
 
 func (h *SaleHandler) ShowReceipt(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
+	id := c.Param("id")
+	if id == "" {
 		renderError(c, fmt.Errorf("invalid sale ID"))
 		return
 	}
@@ -112,9 +109,8 @@ func (h *SaleHandler) ShowReceipt(c *gin.Context) {
 }
 
 func (h *SaleHandler) DownloadReceipt(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
+	id := c.Param("id")
+	if id == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid ID"})
 		return
 	}
@@ -132,7 +128,11 @@ func (h *SaleHandler) DownloadReceipt(c *gin.Context) {
 	}
 
 	c.Header("Content-Type", "application/pdf")
-	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=receipt-%s.pdf", sale.ID.String()[:8]))
+	suffix := sale.ID
+	if len(suffix) > 8 {
+		suffix = suffix[:8]
+	}
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=receipt-%s.pdf", suffix))
 	c.Data(http.StatusOK, "application/pdf", pdf)
 }
 
