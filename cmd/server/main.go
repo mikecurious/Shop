@@ -115,12 +115,14 @@ func main() {
 		downloads.GET("/sales/:id/receipt/pdf", saleH.DownloadReceipt)
 	}
 
+	// Public API routes (no auth)
+	r.POST("/api/v1/auth/login", middleware.RateLimit(cfg.RateLimit.Auth), authH.APILogin)
+
 	// API routes — Bearer token auth
 	api := r.Group("/api/v1")
 	api.Use(middleware.APIAuthRequired(authSvc))
 	api.Use(middleware.RateLimit(cfg.RateLimit.API))
 	{
-		api.POST("/auth/login", authH.APILogin)
 		api.GET("/stats", dashH.APIStats)
 
 		api.GET("/products", productH.APIList)
