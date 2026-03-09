@@ -1,10 +1,8 @@
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/michaelbrian/kiosk/internal/middleware"
@@ -435,20 +433,3 @@ func countLowStock(products []*models.Product) int {
 	return count
 }
 
-// Helper: marshal to JSON string for template use
-func toJSON(v any) string {
-	b, _ := json.Marshal(v)
-	return string(b)
-}
-
-func formatFloat(f float64, decimals int) string {
-	format := fmt.Sprintf("%%.%df", decimals)
-	return fmt.Sprintf(format, f)
-}
-
-func percentOf(part, total float64) string {
-	if total == 0 {
-		return "0"
-	}
-	return strconv.FormatFloat((part/total)*100, 'f', 1, 64)
-}

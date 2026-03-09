@@ -44,7 +44,7 @@ func (r *PaymentRepository) GetByCheckoutID(ctx context.Context, checkoutID stri
 	p := &models.Payment{}
 	if err := r.col.FindOne(ctx, bson.M{"checkout_request_id": checkoutID}).Decode(p); err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, fmt.Errorf("payment not found")
+			return nil, nil
 		}
 		return nil, err
 	}

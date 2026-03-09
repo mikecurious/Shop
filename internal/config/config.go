@@ -150,5 +150,9 @@ func getEnv(key, defaultVal string) string {
 }
 
 func mustGetEnv(key string) string {
-	return os.Getenv(key)
+	val := os.Getenv(key)
+	if val == "" {
+		panic("required environment variable not set: " + key)
+	}
+	return val
 }
