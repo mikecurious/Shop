@@ -286,6 +286,45 @@ func (h *ProductHandler) GetBarcode(c *gin.Context) {
 
 // --- API handlers ---
 
+// apiProduct maps backend model fields to the names the React frontend expects.
+type apiProduct struct {
+	ID            string  `json:"id"`
+	Name          string  `json:"name"`
+	Description   string  `json:"description"`
+	SKU           string  `json:"sku"`
+	Barcode       string  `json:"barcode"`
+	Category      string  `json:"category"`
+	CategoryID    *string `json:"category_id"`
+	Price         float64 `json:"price"`
+	Cost          float64 `json:"cost"`
+	Stock         int     `json:"stock"`
+	MinStock      int     `json:"min_stock"`
+	SupplierName  string  `json:"supplier_name"`
+	SupplierPhone string  `json:"supplier_phone"`
+	ImageURL      string  `json:"image_url"`
+	IsActive      bool    `json:"is_active"`
+}
+
+func toAPIProduct(p *models.Product) apiProduct {
+	return apiProduct{
+		ID:            p.ID,
+		Name:          p.Name,
+		Description:   p.Description,
+		SKU:           p.SKU,
+		Barcode:       p.Barcode,
+		Category:      p.CategoryName,
+		CategoryID:    p.CategoryID,
+		Price:         p.SellingPrice,
+		Cost:          p.BuyingPrice,
+		Stock:         p.Quantity,
+		MinStock:      p.ReorderLevel,
+		SupplierName:  p.SupplierName,
+		SupplierPhone: p.SupplierPhone,
+		ImageURL:      p.ImageURL,
+		IsActive:      p.IsActive,
+	}
+}
+
 func (h *ProductHandler) APIList(c *gin.Context) {
 	page, limit := paginationParams(c)
 	filter := repository.ProductFilter{
@@ -302,11 +341,16 @@ func (h *ProductHandler) APIList(c *gin.Context) {
 		return
 	}
 
+	out := make([]apiProduct, len(products))
+	for i, p := range products {
+		out[i] = toAPIProduct(p)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"data":  products,
-		"total": total,
-		"page":  page,
-		"limit": limit,
+		"products": out,
+		"total":    total,
+		"page":     page,
+		"per_page": limit,
 	})
 }
 
@@ -323,7 +367,7 @@ func (h *ProductHandler) APICreate(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusCreated, product)
+	c.JSON(http.StatusCreated, toAPIProduct(product))
 }
 
 func (h *ProductHandler) APIGet(c *gin.Context) {
@@ -336,7 +380,7 @@ func (h *ProductHandler) APIGet(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
 		return
 	}
-	c.JSON(http.StatusOK, product)
+	c.JSON(http.StatusOK, toAPIProduct(product))
 }
 
 func (h *ProductHandler) APIUpdate(c *gin.Context) {
@@ -354,7 +398,7 @@ func (h *ProductHandler) APIUpdate(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, product)
+	c.JSON(http.StatusOK, toAPIProduct(product))
 }
 
 func (h *ProductHandler) APIDelete(c *gin.Context) {
@@ -379,7 +423,7 @@ func (h *ProductHandler) APISearch(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
 			return
 		}
-		c.JSON(http.StatusOK, product)
+		c.JSON(http.StatusOK, toAPIProduct(product))
 		return
 	}
 
@@ -391,7 +435,11 @@ func (h *ProductHandler) APISearch(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, products)
+	out := make([]apiProduct, len(products))
+	for i, p := range products {
+		out[i] = toAPIProduct(p)
+	}
+	c.JSON(http.StatusOK, out)
 }
 
 // HTMX partial: product search results for sales page
@@ -416,11 +464,7 @@ func (h *ProductHandler) LowStockPartial(c *gin.Context) {
 }
 
 func renderError(c *gin.Context, err error) {
-	if c.GetHeader("HX-Request") == "true" {
-		c.HTML(http.StatusBadRequest, "partials/error_toast.html", gin.H{"error": err.Error()})
-		return
-	}
-	c.HTML(http.StatusInternalServerError, "error.html", gin.H{"message": err.Error()})
+	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 }
 
 func countLowStock(products []*models.Product) int {

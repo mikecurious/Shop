@@ -82,9 +82,48 @@ func (h *SaleHandler) CreateSale(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"sale_id":    sale.ID,
-		"net_amount": sale.NetAmount,
-		"receipt_url": fmt.Sprintf("/sales/%s/receipt", sale.ID),
+		"id":          sale.ID,
+		"items":       sale.Items,
+		"subtotal":    sale.TotalAmount,
+		"total":       sale.NetAmount,
+		"payment_method": string(sale.PaymentMethod),
+		"customer_name":  sale.CustomerName,
+		"created_at":     sale.CreatedAt,
+		"receipt_url":    fmt.Sprintf("/sales/%s/receipt/pdf", sale.ID),
+	})
+}
+
+func (h *SaleHandler) APIListSales(c *gin.Context) {
+	page, limit := paginationParams(c)
+	fromStr := c.Query("from")
+	toStr := c.Query("to")
+
+	filter := repository.SaleFilter{Page: page, Limit: limit}
+	if fromStr != "" {
+		filter.From, _ = time.Parse("2006-01-02", fromStr)
+	}
+	if toStr != "" {
+		t, _ := time.Parse("2006-01-02", toStr)
+		filter.To = t.Add(24*time.Hour - time.Second)
+	}
+	if filter.From.IsZero() {
+		filter.From = time.Now().AddDate(0, 0, -30)
+	}
+	if filter.To.IsZero() {
+		filter.To = time.Now()
+	}
+
+	sales, total, err := h.saleSvc.ListSales(c.Request.Context(), filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":  sales,
+		"total": total,
+		"page":  page,
+		"limit": limit,
 	})
 }
 

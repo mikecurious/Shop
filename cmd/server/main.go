@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"html/template"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -63,7 +63,6 @@ func main() {
 
 	mpesaClient := mpesa.NewClient(&cfg.MPesa)
 
-	// Seed default admin
 	seedAdminUser(authSvc)
 
 	if cfg.App.Env == "production" {
@@ -83,36 +82,10 @@ func main() {
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     allowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-CSRF-Token"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
-
-	r.SetFuncMap(template.FuncMap{
-		"add": func(a, b int) int { return a + b },
-		"sub": func(a, b int) int { return a - b },
-		"mul": func(a float64, b int) float64 { return a * float64(b) },
-		"fmtMoney": func(f float64) string { return fmt.Sprintf("KES %.2f", f) },
-		"fmtDate":  func(t time.Time) string { return t.Format("02 Jan 2006") },
-		"fmtDateTime": func(t time.Time) string { return t.Format("02 Jan 2006 15:04") },
-		"isAdmin":  func(role string) bool { return role == "admin" },
-		"percent": func(a, b float64) string {
-			if b == 0 {
-				return "0%"
-			}
-			return fmt.Sprintf("%.1f%%", (a/b)*100)
-		},
-		"seq": func(n int) []int {
-			result := make([]int, n)
-			for i := range result {
-				result[i] = i + 1
-			}
-			return result
-		},
-		"safeHTML": func(s string) template.HTML { return template.HTML(s) }, //nolint:gosec
-	})
-	r.LoadHTMLGlob("templates/**/*.html")
-	r.Static("/static", "./static")
 
 	// Handlers
 	authH := handlers.NewAuthHandler(authSvc)
@@ -122,108 +95,81 @@ func main() {
 	mpesaH := handlers.NewMPesaHandler(paymentRepo, mpesaClient)
 	reportH := handlers.NewReportHandler(reportSvc, saleSvc)
 
-	// Public routes
-	// CSRF on all web routes (login included to prevent login CSRF)
-	csrfMw := middleware.CSRF(cfg.CSRF.Secret)
+	// React SPA static assets
+	r.Static("/assets", "./dist/assets")
+	r.StaticFile("/favicon.ico", "./dist/favicon.ico")
+	r.StaticFile("/robots.txt", "./dist/robots.txt")
 
-	r.GET("/", func(c *gin.Context) { c.Redirect(http.StatusFound, "/login") })
-	r.GET("/login", csrfMw, authH.ShowLogin)
-	r.POST("/login", csrfMw, middleware.RateLimit(cfg.RateLimit.Auth), authH.Login)
-	r.GET("/logout", authH.Logout)
-	r.POST("/api/mpesa/callback", mpesaH.Callback) // M-Pesa callback: no CSRF (external service)
+	// M-Pesa callback (no auth — external service)
+	r.POST("/api/mpesa/callback", mpesaH.Callback)
 
-	// Protected web routes
-	web := r.Group("/")
-	web.Use(middleware.AuthRequired(authSvc))
-	web.Use(csrfMw)
+	// Cookie-auth downloads (report CSVs/PDFs opened via window.open)
+	downloads := r.Group("/")
+	downloads.Use(middleware.AuthRequired(authSvc))
 	{
-		web.GET("/dashboard", dashH.Index)
-		web.GET("/dashboard/pl", dashH.PLReport)
-
-		web.GET("/inventory", productH.Index)
-		web.GET("/inventory/create", productH.ShowCreate)
-		web.POST("/inventory/create", productH.Create)
-		web.GET("/inventory/import", productH.ShowImport)
-		web.POST("/inventory/import", productH.ImportCSV)
-		web.GET("/inventory/:id", productH.Show)
-		web.GET("/inventory/:id/edit", productH.ShowEdit)
-		web.POST("/inventory/:id/edit", productH.Update)
-		web.POST("/inventory/:id/delete", middleware.AdminRequired(), productH.Delete)
-		web.POST("/inventory/stock/adjust", productH.AdjustStock)
-		web.GET("/inventory/:id/barcode", productH.GetBarcode)
-
-		web.GET("/sales", saleH.Index)
-		web.GET("/sales/pos", saleH.ShowPOS)
-		web.GET("/sales/:id/receipt", saleH.ShowReceipt)
-		web.GET("/sales/:id/receipt/pdf", saleH.DownloadReceipt)
-
-		web.GET("/payments", mpesaH.Index)
-
-		web.GET("/reports", reportH.Index)
-		web.GET("/reports/sales/csv", reportH.ExportSalesCSV)
-		web.GET("/reports/inventory/csv", reportH.ExportInventoryCSV)
-		web.GET("/reports/pl/csv", reportH.ExportPLCSV)
-		web.GET("/reports/pl/pdf", reportH.ExportPLPDF)
-
-		web.GET("/profile", authH.ShowProfile)
-		web.POST("/profile/password", authH.ChangePassword)
-
-		// HTMX partials
-		web.GET("/partials/stats", dashH.StatsPartial)
-		web.GET("/partials/products/search", productH.SearchPartial)
-		web.GET("/partials/low-stock", productH.LowStockPartial)
-
-		// Admin only
-		admin := web.Group("/admin")
-		admin.Use(middleware.AdminRequired())
-		{
-			admin.GET("/users", func(c *gin.Context) {
-				users, err := authSvc.ListUsers(c.Request.Context())
-				if err != nil {
-					c.HTML(http.StatusInternalServerError, "error.html", gin.H{"message": err.Error()})
-					return
-				}
-				c.HTML(http.StatusOK, "auth/users.html", gin.H{
-					"title":       "User Management",
-					"users":       users,
-					"claims":      middleware.GetClaims(c),
-					"csrf_token":  middleware.GetCSRFToken(c),
-				})
-			})
-			admin.POST("/users", func(c *gin.Context) {
-				var req models.RegisterRequest
-				if err := c.ShouldBind(&req); err != nil {
-					c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-					return
-				}
-				user, err := authSvc.Register(c.Request.Context(), req)
-				if err != nil {
-					c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-					return
-				}
-				c.JSON(http.StatusCreated, user)
-			})
-		}
+		downloads.GET("/logout", authH.Logout)
+		downloads.GET("/reports/sales/csv", reportH.ExportSalesCSV)
+		downloads.GET("/reports/inventory/csv", reportH.ExportInventoryCSV)
+		downloads.GET("/reports/pl/csv", reportH.ExportPLCSV)
+		downloads.GET("/reports/pl/pdf", reportH.ExportPLPDF)
+		downloads.GET("/sales/:id/receipt/pdf", saleH.DownloadReceipt)
 	}
 
-	// API routes
+	// API routes — Bearer token auth
 	api := r.Group("/api/v1")
 	api.Use(middleware.APIAuthRequired(authSvc))
 	api.Use(middleware.RateLimit(cfg.RateLimit.API))
 	{
 		api.POST("/auth/login", authH.APILogin)
+		api.GET("/stats", dashH.APIStats)
+
 		api.GET("/products", productH.APIList)
 		api.POST("/products", productH.APICreate)
 		api.GET("/products/search", productH.APISearch)
 		api.GET("/products/:id", productH.APIGet)
 		api.PUT("/products/:id", productH.APIUpdate)
 		api.DELETE("/products/:id", middleware.AdminRequired(), productH.APIDelete)
+
+		api.GET("/sales", saleH.APIListSales)
 		api.POST("/sales", saleH.CreateSale)
 		api.GET("/sales/:id", saleH.GetSale)
+
 		api.POST("/mpesa/stk-push", mpesaH.STKPush)
 		api.GET("/mpesa/status/:checkout_id", mpesaH.CheckStatus)
 		api.POST("/mpesa/link-sale", mpesaH.LinkToSale)
+
+		// Admin
+		api.GET("/users", middleware.AdminRequired(), func(c *gin.Context) {
+			users, err := authSvc.ListUsers(c.Request.Context())
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, users)
+		})
+		api.POST("/users", middleware.AdminRequired(), func(c *gin.Context) {
+			var req models.RegisterRequest
+			if err := c.ShouldBindJSON(&req); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			user, err := authSvc.Register(c.Request.Context(), req)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusCreated, user)
+		})
 	}
+
+	// SPA fallback — serve index.html for all non-API routes
+	r.NoRoute(func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		c.File("./dist/index.html")
+	})
 
 	go runDailyJobs(notifSvc, saleSvc)
 

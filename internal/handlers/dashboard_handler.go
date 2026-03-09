@@ -100,3 +100,23 @@ func (h *DashboardHandler) StatsPartial(c *gin.Context) {
 	stats, _ := h.saleSvc.GetDashboardStats(c.Request.Context())
 	c.HTML(http.StatusOK, "partials/dashboard_stats.html", gin.H{"stats": stats})
 }
+
+func (h *DashboardHandler) APIStats(c *gin.Context) {
+	ctx := c.Request.Context()
+	stats, err := h.saleSvc.GetDashboardStats(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	from := time.Now().AddDate(0, 0, -30)
+	to := time.Now()
+	topProducts, _ := h.saleSvc.GetTopProducts(ctx, from, to, 5)
+	lowStock, _ := h.productSvc.GetLowStock(ctx)
+
+	c.JSON(http.StatusOK, gin.H{
+		"stats":        stats,
+		"top_products": topProducts,
+		"low_stock":    lowStock,
+	})
+}
