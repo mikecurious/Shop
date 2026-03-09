@@ -10,6 +10,19 @@ WORKDIR /frontend
 ARG VITE_API_BASE_URL=https://shop.dominicatechnologies.com
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
+# Replace Lovable branding with Dominica Shop branding
+COPY favicon.svg /frontend/public/favicon.svg
+RUN rm -f /frontend/public/favicon.ico && \
+    sed -i \
+      -e 's|<title>Lovable App</title>|<title>Dominica Shop</title>|' \
+      -e 's|content="Lovable Generated Project"|content="Dominica Shop — Kiosk Management System"|' \
+      -e 's|content="Lovable App"|content="Dominica Shop"|' \
+      -e 's|content="Lovable"|content="Dominica Technologies"|' \
+      -e 's|content="@Lovable"|content="@DominicaTech"|' \
+      -e 's|content="https://lovable.dev/opengraph-image-p98pqg.png"||g' \
+      -e 's|<meta name="viewport"|<link rel="icon" href="/favicon.svg" type="image/svg+xml" />\n    <meta name="viewport"|' \
+      /frontend/index.html
+
 RUN npm install
 RUN npm run build
 
