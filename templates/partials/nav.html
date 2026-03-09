@@ -112,6 +112,12 @@
     document.getElementById('toast-container').appendChild(toast);
     setTimeout(() => { toast.style.opacity='0'; setTimeout(()=>toast.remove(), 300); }, 3500);
   }
+
+  // Send CSRF token with every HTMX request (reads from non-httpOnly cookie)
+  document.body.addEventListener('htmx:configRequest', function(evt) {
+    const match = document.cookie.split(';').find(c => c.trim().startsWith('csrf_token='));
+    if (match) evt.detail.headers['X-CSRF-Token'] = decodeURIComponent(match.split('=')[1]);
+  });
 </script>
 </html>
 {{end}}

@@ -24,28 +24,28 @@ func (h *AuthHandler) ShowLogin(c *gin.Context) {
 		c.Redirect(http.StatusFound, "/dashboard")
 		return
 	}
-	c.HTML(http.StatusOK, "auth/login.html", gin.H{
+	c.HTML(http.StatusOK, "auth/login.html", withCSRF(c, gin.H{
 		"title": "Login",
-	})
+	}))
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req models.LoginRequest
 	if err := c.ShouldBind(&req); err != nil {
-		c.HTML(http.StatusBadRequest, "auth/login.html", gin.H{
+		c.HTML(http.StatusBadRequest, "auth/login.html", withCSRF(c, gin.H{
 			"title": "Login",
 			"error": "Invalid email or password format",
-		})
+		}))
 		return
 	}
 
 	token, user, err := h.authSvc.Login(c.Request.Context(), req)
 	if err != nil {
-		c.HTML(http.StatusUnauthorized, "auth/login.html", gin.H{
+		c.HTML(http.StatusUnauthorized, "auth/login.html", withCSRF(c, gin.H{
 			"title": "Login",
 			"error": "Invalid email or password",
 			"email": req.Email,
-		})
+		}))
 		return
 	}
 
@@ -89,10 +89,10 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 func (h *AuthHandler) ShowProfile(c *gin.Context) {
 	claims := middleware.GetClaims(c)
-	c.HTML(http.StatusOK, "auth/profile.html", gin.H{
+	c.HTML(http.StatusOK, "auth/profile.html", withCSRF(c, gin.H{
 		"title":  "Profile",
 		"claims": claims,
-	})
+	}))
 }
 
 func (h *AuthHandler) ChangePassword(c *gin.Context) {
@@ -103,28 +103,28 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		NewPassword string `form:"new_password" binding:"required,min=8"`
 	}
 	if err := c.ShouldBind(&form); err != nil {
-		c.HTML(http.StatusBadRequest, "auth/profile.html", gin.H{
+		c.HTML(http.StatusBadRequest, "auth/profile.html", withCSRF(c, gin.H{
 			"title":  "Profile",
 			"claims": claims,
 			"error":  "New password must be at least 8 characters",
-		})
+		}))
 		return
 	}
 
 	if err := h.authSvc.ChangePassword(c.Request.Context(), claims.UserID, form.OldPassword, form.NewPassword); err != nil {
-		c.HTML(http.StatusBadRequest, "auth/profile.html", gin.H{
+		c.HTML(http.StatusBadRequest, "auth/profile.html", withCSRF(c, gin.H{
 			"title":  "Profile",
 			"claims": claims,
 			"error":  err.Error(),
-		})
+		}))
 		return
 	}
 
-	c.HTML(http.StatusOK, "auth/profile.html", gin.H{
+	c.HTML(http.StatusOK, "auth/profile.html", withCSRF(c, gin.H{
 		"title":   "Profile",
 		"claims":  claims,
 		"success": "Password changed successfully",
-	})
+	}))
 }
 
 // API endpoints

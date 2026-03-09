@@ -123,15 +123,19 @@ func main() {
 	reportH := handlers.NewReportHandler(reportSvc, saleSvc)
 
 	// Public routes
+	// CSRF on all web routes (login included to prevent login CSRF)
+	csrfMw := middleware.CSRF(cfg.CSRF.Secret)
+
 	r.GET("/", func(c *gin.Context) { c.Redirect(http.StatusFound, "/login") })
-	r.GET("/login", authH.ShowLogin)
-	r.POST("/login", middleware.RateLimit(cfg.RateLimit.Auth), authH.Login)
+	r.GET("/login", csrfMw, authH.ShowLogin)
+	r.POST("/login", csrfMw, middleware.RateLimit(cfg.RateLimit.Auth), authH.Login)
 	r.GET("/logout", authH.Logout)
-	r.POST("/api/mpesa/callback", mpesaH.Callback)
+	r.POST("/api/mpesa/callback", mpesaH.Callback) // M-Pesa callback: no CSRF (external service)
 
 	// Protected web routes
 	web := r.Group("/")
 	web.Use(middleware.AuthRequired(authSvc))
+	web.Use(csrfMw)
 	{
 		web.GET("/dashboard", dashH.Index)
 		web.GET("/dashboard/pl", dashH.PLReport)
@@ -180,9 +184,10 @@ func main() {
 					return
 				}
 				c.HTML(http.StatusOK, "auth/users.html", gin.H{
-					"title":  "User Management",
-					"users":  users,
-					"claims": middleware.GetClaims(c),
+					"title":       "User Management",
+					"users":       users,
+					"claims":      middleware.GetClaims(c),
+					"csrf_token":  middleware.GetCSRFToken(c),
 				})
 			})
 			admin.POST("/users", func(c *gin.Context) {

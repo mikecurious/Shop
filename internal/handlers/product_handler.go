@@ -95,11 +95,11 @@ func (h *ProductHandler) Show(c *gin.Context) {
 
 func (h *ProductHandler) ShowCreate(c *gin.Context) {
 	categories, _ := h.productSvc.GetCategories(c.Request.Context())
-	c.HTML(http.StatusOK, "inventory/create.html", gin.H{
+	c.HTML(http.StatusOK, "inventory/create.html", withCSRF(c, gin.H{
 		"title":      "Add Product",
 		"categories": categories,
 		"claims":     middleware.GetClaims(c),
-	})
+	}))
 }
 
 func (h *ProductHandler) Create(c *gin.Context) {
@@ -108,25 +108,25 @@ func (h *ProductHandler) Create(c *gin.Context) {
 
 	var req models.CreateProductRequest
 	if err := c.ShouldBind(&req); err != nil {
-		c.HTML(http.StatusBadRequest, "inventory/create.html", gin.H{
+		c.HTML(http.StatusBadRequest, "inventory/create.html", withCSRF(c, gin.H{
 			"title":      "Add Product",
 			"error":      err.Error(),
 			"categories": categories,
 			"claims":     claims,
-		})
+		}))
 		return
 	}
 
 	createdBy := claims.UserID
 	product, err := h.productSvc.Create(c.Request.Context(), req, createdBy)
 	if err != nil {
-		c.HTML(http.StatusBadRequest, "inventory/create.html", gin.H{
+		c.HTML(http.StatusBadRequest, "inventory/create.html", withCSRF(c, gin.H{
 			"title":      "Add Product",
 			"error":      err.Error(),
 			"categories": categories,
 			"req":        req,
 			"claims":     claims,
-		})
+		}))
 		return
 	}
 
@@ -146,12 +146,12 @@ func (h *ProductHandler) ShowEdit(c *gin.Context) {
 	}
 
 	categories, _ := h.productSvc.GetCategories(c.Request.Context())
-	c.HTML(http.StatusOK, "inventory/edit.html", gin.H{
+	c.HTML(http.StatusOK, "inventory/edit.html", withCSRF(c, gin.H{
 		"title":      "Edit Product",
 		"product":    product,
 		"categories": categories,
 		"claims":     middleware.GetClaims(c),
-	})
+	}))
 }
 
 func (h *ProductHandler) Update(c *gin.Context) {
@@ -222,11 +222,11 @@ func (h *ProductHandler) ImportCSV(c *gin.Context) {
 
 	file, _, err := c.Request.FormFile("csv_file")
 	if err != nil {
-		c.HTML(http.StatusBadRequest, "inventory/import.html", gin.H{
+		c.HTML(http.StatusBadRequest, "inventory/import.html", withCSRF(c, gin.H{
 			"title":  "Import Products",
 			"error":  "Please select a CSV file",
 			"claims": claims,
-		})
+		}))
 		return
 	}
 	defer file.Close()
@@ -238,19 +238,19 @@ func (h *ProductHandler) ImportCSV(c *gin.Context) {
 		return
 	}
 
-	c.HTML(http.StatusOK, "inventory/import.html", gin.H{
+	c.HTML(http.StatusOK, "inventory/import.html", withCSRF(c, gin.H{
 		"title":    "Import Products",
 		"imported": imported,
 		"errors":   errs,
 		"claims":   claims,
-	})
+	}))
 }
 
 func (h *ProductHandler) ShowImport(c *gin.Context) {
-	c.HTML(http.StatusOK, "inventory/import.html", gin.H{
+	c.HTML(http.StatusOK, "inventory/import.html", withCSRF(c, gin.H{
 		"title":  "Import Products",
 		"claims": middleware.GetClaims(c),
-	})
+	}))
 }
 
 func (h *ProductHandler) GetBarcode(c *gin.Context) {

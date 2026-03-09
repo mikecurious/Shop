@@ -6,7 +6,14 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/michaelbrian/kiosk/internal/middleware"
 )
+
+// withCSRF merges the current CSRF token into a template data map.
+func withCSRF(c *gin.Context, data gin.H) gin.H {
+	data["csrf_token"] = middleware.GetCSRFToken(c)
+	return data
+}
 
 // parseUUIDParam extracts a string ID from a URL param and validates it's non-empty.
 func parseUUIDParam(c *gin.Context, param string) (string, bool) {

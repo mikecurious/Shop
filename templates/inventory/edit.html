@@ -17,6 +17,7 @@
   {{with .product}}
   <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
     <form method="POST" action="/inventory/{{.ID}}/edit" class="space-y-5">
+      <input type="hidden" name="_csrf" value="{{$.csrf_token}}">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
         <div class="md:col-span-2">
@@ -99,6 +100,7 @@
     <p class="text-sm text-red-600 mb-3">Deactivating this product will hide it from inventory and sales.</p>
     <form method="POST" action="/inventory/{{.ID}}/delete"
           onsubmit="return confirm('Deactivate this product?')">
+      <input type="hidden" name="_csrf" value="{{$.csrf_token}}">
       <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700">
         Deactivate Product
       </button>
