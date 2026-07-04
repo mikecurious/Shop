@@ -27,7 +27,9 @@ services:
     environment:
       MONGODB_URI: mongodb://mongodb:27017
       VIRTUAL_HOST: shop.dominicatechnologies.com
+      VIRTUAL_PORT: 8080
       LETSENCRYPT_HOST: shop.dominicatechnologies.com
+      LETSENCRYPT_EMAIL: admin@dominicatechnologies.com
     expose:
       - "8080"
     volumes:
