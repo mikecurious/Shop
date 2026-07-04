@@ -25,7 +25,7 @@ services:
     env_file:
       - .env
     environment:
-      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_URI: mongodb://kiosk-mongodb:27017
       VIRTUAL_HOST: shop.dominicatechnologies.com
       VIRTUAL_PORT: 8080
       LETSENCRYPT_HOST: shop.dominicatechnologies.com
