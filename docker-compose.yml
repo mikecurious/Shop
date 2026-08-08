@@ -35,12 +35,14 @@ services:
     volumes:
       - ./templates:/app/templates:ro
       - ./static:/app/static:ro
+      - product_photos:/app/static/uploads
     networks:
       - shop
       - app-network
 
 volumes:
   mongo_data:
+  product_photos:
 
 networks:
   shop:

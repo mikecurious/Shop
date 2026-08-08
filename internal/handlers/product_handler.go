@@ -1,16 +1,73 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/michaelbrian/kiosk/internal/middleware"
 	"github.com/michaelbrian/kiosk/internal/models"
 	"github.com/michaelbrian/kiosk/internal/repository"
 	"github.com/michaelbrian/kiosk/internal/services"
 	"github.com/michaelbrian/kiosk/pkg/barcode"
 )
+
+const maxProductPhotoSize = 5 << 20 // 5MB
+
+var allowedPhotoTypes = map[string]string{
+	"image/jpeg": ".jpg",
+	"image/png":  ".png",
+	"image/webp": ".webp",
+	"image/gif":  ".gif",
+}
+
+// saveProductPhoto reads an optional "photo" file field from a multipart
+// form, validates its size and content type, and saves it under
+// ./static/uploads/products/. Returns "" with a nil error when no file
+// was submitted (photo uploads are optional on create and edit).
+func saveProductPhoto(c *gin.Context) (string, error) {
+	file, header, err := c.Request.FormFile("photo")
+	if err != nil {
+		if errors.Is(err, http.ErrMissingFile) {
+			return "", nil
+		}
+		return "", fmt.Errorf("read photo upload: %w", err)
+	}
+	defer file.Close()
+
+	if header.Size > maxProductPhotoSize {
+		return "", fmt.Errorf("photo must be smaller than 5MB")
+	}
+
+	sniff := make([]byte, 512)
+	n, _ := file.Read(sniff)
+	contentType := http.DetectContentType(sniff[:n])
+	ext, ok := allowedPhotoTypes[contentType]
+	if !ok {
+		return "", fmt.Errorf("unsupported image type %q (use JPEG, PNG, WEBP, or GIF)", contentType)
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return "", fmt.Errorf("read photo upload: %w", err)
+	}
+
+	filename := uuid.New().String() + ext
+	dst, err := os.Create(filepath.Join("static", "uploads", "products", filename))
+	if err != nil {
+		return "", fmt.Errorf("save photo: %w", err)
+	}
+	defer dst.Close()
+
+	if _, err := io.Copy(dst, file); err != nil {
+		return "", fmt.Errorf("save photo: %w", err)
+	}
+
+	return "/static/uploads/products/" + filename, nil
+}
 
 type ProductHandler struct {
 	productSvc *services.ProductService
@@ -117,6 +174,19 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		return
 	}
 
+	imageURL, err := saveProductPhoto(c)
+	if err != nil {
+		c.HTML(http.StatusBadRequest, "inventory/create.html", withCSRF(c, gin.H{
+			"title":      "Add Product",
+			"error":      err.Error(),
+			"categories": categories,
+			"req":        req,
+			"claims":     claims,
+		}))
+		return
+	}
+	req.ImageURL = imageURL
+
 	createdBy := claims.UserID
 	product, err := h.productSvc.Create(c.Request.Context(), req, createdBy)
 	if err != nil {
@@ -130,7 +200,7 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		return
 	}
 
-	c.Redirect(http.StatusFound, fmt.Sprintf("/inventory/%s", product.ID))
+	c.Redirect(http.StatusFound, fmt.Sprintf("/staff/inventory/%s", product.ID))
 }
 
 func (h *ProductHandler) ShowEdit(c *gin.Context) {
@@ -166,13 +236,28 @@ func (h *ProductHandler) Update(c *gin.Context) {
 		return
 	}
 
+	imageURL, err := saveProductPhoto(c)
+	if err != nil {
+		product, _ := h.productSvc.GetByID(c.Request.Context(), id)
+		categories, _ := h.productSvc.GetCategories(c.Request.Context())
+		c.HTML(http.StatusBadRequest, "inventory/edit.html", withCSRF(c, gin.H{
+			"title":      "Edit Product",
+			"error":      err.Error(),
+			"product":    product,
+			"categories": categories,
+			"claims":     middleware.GetClaims(c),
+		}))
+		return
+	}
+	req.ImageURL = imageURL
+
 	product, err := h.productSvc.Update(c.Request.Context(), id, req)
 	if err != nil {
 		renderError(c, err)
 		return
 	}
 
-	c.Redirect(http.StatusFound, fmt.Sprintf("/inventory/%s?updated=1", product.ID))
+	c.Redirect(http.StatusFound, fmt.Sprintf("/staff/inventory/%s?updated=1", product.ID))
 }
 
 func (h *ProductHandler) Delete(c *gin.Context) {
@@ -187,11 +272,11 @@ func (h *ProductHandler) Delete(c *gin.Context) {
 	}
 
 	if c.GetHeader("HX-Request") == "true" {
-		c.Header("HX-Redirect", "/inventory")
+		c.Header("HX-Redirect", "/staff/inventory")
 		c.Status(http.StatusOK)
 		return
 	}
-	c.Redirect(http.StatusFound, "/inventory")
+	c.Redirect(http.StatusFound, "/staff/inventory")
 }
 
 func (h *ProductHandler) AdjustStock(c *gin.Context) {

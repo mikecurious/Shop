@@ -21,20 +21,15 @@ func AuthRequired(authSvc *services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := extractToken(c)
 		if token == "" {
-			// Check cookie
-			cookie, err := c.Cookie("auth_token")
-			if err != nil || cookie == "" {
-				c.Redirect(http.StatusFound, "/login")
-				c.Abort()
-				return
-			}
-			token = cookie
+			c.Redirect(http.StatusFound, "/staff/login")
+			c.Abort()
+			return
 		}
 
 		claims, err := authSvc.ValidateToken(token)
 		if err != nil {
 			c.SetCookie("auth_token", "", -1, "/", "", false, true)
-			c.Redirect(http.StatusFound, "/login")
+			c.Redirect(http.StatusFound, "/staff/login")
 			c.Abort()
 			return
 		}
@@ -98,6 +93,10 @@ func GetClaims(c *gin.Context) *models.Claims {
 	return claims
 }
 
+// extractToken reads the JWT from the Authorization header (Bearer token
+// clients, e.g. design-spark) and falls back to the auth_token cookie
+// (browser sessions on the server-rendered staff UI calling /api/v1/*
+// with credentials: 'include', e.g. the POS checkout).
 func extractToken(c *gin.Context) string {
 	authHeader := c.GetHeader("Authorization")
 	if authHeader != "" {
@@ -105,6 +104,9 @@ func extractToken(c *gin.Context) string {
 		if len(parts) == 2 && strings.ToLower(parts[0]) == "bearer" {
 			return parts[1]
 		}
+	}
+	if cookie, err := c.Cookie("auth_token"); err == nil {
+		return cookie
 	}
 	return ""
 }

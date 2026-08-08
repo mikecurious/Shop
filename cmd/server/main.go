@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"html/template"
 	"net/http"
 	"os"
 	"os/signal"
@@ -87,6 +88,35 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
+	r.SetFuncMap(template.FuncMap{
+		"add":      func(a, b int) int { return a + b },
+		"sub":      func(a, b int) int { return a - b },
+		"mul":      func(a float64, b int) float64 { return a * float64(b) },
+		"fmtMoney": func(f float64) string { return fmt.Sprintf("KES %.2f", f) },
+		"fmtDate":  func(t time.Time) string { return t.Format("02 Jan 2006") },
+		"fmtDateTime": func(t time.Time) string { return t.Format("02 Jan 2006 15:04") },
+		"isAdmin":  func(role models.Role) bool { return role == models.RoleAdmin },
+		"percent": func(a, b float64) string {
+			if b == 0 {
+				return "0%"
+			}
+			return fmt.Sprintf("%.1f%%", (a/b)*100)
+		},
+		"seq": func(n int) []int {
+			result := make([]int, n)
+			for i := range result {
+				result[i] = i + 1
+			}
+			return result
+		},
+		"safeHTML": func(s string) template.HTML { return template.HTML(s) }, //nolint:gosec
+	})
+	r.LoadHTMLGlob("templates/**/*.html")
+	r.Static("/static", "./static")
+	if err := os.MkdirAll("./static/uploads/products", 0o755); err != nil {
+		log.Fatal().Err(err).Msg("failed to create uploads directory")
+	}
+
 	// Handlers
 	authH := handlers.NewAuthHandler(authSvc)
 	productH := handlers.NewProductHandler(productSvc)
@@ -103,8 +133,16 @@ func main() {
 	// M-Pesa callback (no auth — external service)
 	r.POST("/api/mpesa/callback", mpesaH.Callback)
 
+	// Server-rendered staff UI, namespaced under /staff to avoid colliding
+	// with the design-spark SPA's client-side routes on the same domain
+	// (both apps use names like "dashboard" and "inventory").
+	csrfMw := middleware.CSRF(cfg.CSRF.Secret)
+
+	r.GET("/staff/login", csrfMw, authH.ShowLogin)
+	r.POST("/staff/login", csrfMw, middleware.RateLimit(cfg.RateLimit.Auth), authH.Login)
+
 	// Cookie-auth downloads (report CSVs/PDFs opened via window.open)
-	downloads := r.Group("/")
+	downloads := r.Group("/staff")
 	downloads.Use(middleware.AuthRequired(authSvc))
 	{
 		downloads.GET("/logout", authH.Logout)
@@ -113,6 +151,74 @@ func main() {
 		downloads.GET("/reports/pl/csv", reportH.ExportPLCSV)
 		downloads.GET("/reports/pl/pdf", reportH.ExportPLPDF)
 		downloads.GET("/sales/:id/receipt/pdf", saleH.DownloadReceipt)
+	}
+
+	web := r.Group("/staff")
+	web.Use(middleware.AuthRequired(authSvc))
+	web.Use(csrfMw)
+	{
+		web.GET("/dashboard", dashH.Index)
+		web.GET("/dashboard/pl", dashH.PLReport)
+
+		web.GET("/inventory", productH.Index)
+		web.GET("/inventory/create", productH.ShowCreate)
+		web.POST("/inventory/create", productH.Create)
+		web.GET("/inventory/import", productH.ShowImport)
+		web.POST("/inventory/import", productH.ImportCSV)
+		web.GET("/inventory/:id", productH.Show)
+		web.GET("/inventory/:id/edit", productH.ShowEdit)
+		web.POST("/inventory/:id/edit", productH.Update)
+		web.POST("/inventory/:id/delete", middleware.AdminRequired(), productH.Delete)
+		web.POST("/inventory/stock/adjust", productH.AdjustStock)
+		web.GET("/inventory/:id/barcode", productH.GetBarcode)
+
+		web.GET("/sales", saleH.Index)
+		web.GET("/sales/pos", saleH.ShowPOS)
+		web.GET("/sales/:id/receipt", saleH.ShowReceipt)
+
+		web.GET("/payments", mpesaH.Index)
+
+		web.GET("/reports", reportH.Index)
+
+		web.GET("/profile", authH.ShowProfile)
+		web.POST("/profile/password", authH.ChangePassword)
+
+		// HTMX partials
+		web.GET("/partials/stats", dashH.StatsPartial)
+		web.GET("/partials/products/search", productH.SearchPartial)
+		web.GET("/partials/low-stock", productH.LowStockPartial)
+
+		// Admin only
+		admin := web.Group("/admin")
+		admin.Use(middleware.AdminRequired())
+		{
+			admin.GET("/users", func(c *gin.Context) {
+				users, err := authSvc.ListUsers(c.Request.Context())
+				if err != nil {
+					c.HTML(http.StatusInternalServerError, "error.html", gin.H{"message": err.Error()})
+					return
+				}
+				c.HTML(http.StatusOK, "auth/users.html", gin.H{
+					"title":      "User Management",
+					"users":      users,
+					"claims":     middleware.GetClaims(c),
+					"csrf_token": middleware.GetCSRFToken(c),
+				})
+			})
+			admin.POST("/users", func(c *gin.Context) {
+				var req models.RegisterRequest
+				if err := c.ShouldBind(&req); err != nil {
+					c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+					return
+				}
+				user, err := authSvc.Register(c.Request.Context(), req)
+				if err != nil {
+					c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+					return
+				}
+				c.JSON(http.StatusCreated, user)
+			})
+		}
 	}
 
 	// Public API routes (no auth)

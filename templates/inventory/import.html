@@ -3,7 +3,7 @@
 
 <div class="max-w-2xl">
   <div class="flex items-center gap-3 mb-6">
-    <a href="/inventory" class="text-gray-400 hover:text-gray-600"><i class="fas fa-arrow-left"></i></a>
+    <a href="/staff/inventory" class="text-gray-400 hover:text-gray-600"><i class="fas fa-arrow-left"></i></a>
     <h1 class="text-2xl font-bold text-gray-900">Import Products (CSV)</h1>
   </div>
 
@@ -41,7 +41,7 @@
   </div>
 
   <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-    <form method="POST" action="/inventory/import" enctype="multipart/form-data" class="space-y-4">
+    <form method="POST" action="/staff/inventory/import" enctype="multipart/form-data" class="space-y-4">
       <input type="hidden" name="_csrf" value="{{.csrf_token}}">
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-2">Select CSV File</label>

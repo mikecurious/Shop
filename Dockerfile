@@ -48,8 +48,11 @@ RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
 COPY --from=builder /build/kiosk-server .
 COPY --from=frontend /frontend/dist ./dist
+COPY templates ./templates
+COPY static ./static
 
 RUN addgroup -S kiosk && adduser -S kiosk -G kiosk
+RUN mkdir -p ./static/uploads/products
 RUN chown -R kiosk:kiosk /app
 USER kiosk
 

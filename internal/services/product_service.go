@@ -68,6 +68,7 @@ func (s *ProductService) Create(ctx context.Context, req models.CreateProductReq
 		ReorderLevel:  req.ReorderLevel,
 		SupplierName:  req.SupplierName,
 		SupplierPhone: req.SupplierPhone,
+		ImageURL:      req.ImageURL,
 	}
 
 	if err := s.productRepo.Create(ctx, p); err != nil {
@@ -136,6 +137,9 @@ func (s *ProductService) Update(ctx context.Context, id string, req models.Updat
 	}
 	if req.SupplierPhone != "" {
 		p.SupplierPhone = req.SupplierPhone
+	}
+	if req.ImageURL != "" {
+		p.ImageURL = req.ImageURL
 	}
 
 	if err := s.productRepo.Update(ctx, p); err != nil {

@@ -21,7 +21,7 @@ func NewAuthHandler(authSvc *services.AuthService) *AuthHandler {
 func (h *AuthHandler) ShowLogin(c *gin.Context) {
 	// Redirect if already logged in
 	if _, err := c.Cookie("auth_token"); err == nil {
-		c.Redirect(http.StatusFound, "/dashboard")
+		c.Redirect(http.StatusFound, "/staff/dashboard")
 		return
 	}
 	c.HTML(http.StatusOK, "auth/login.html", withCSRF(c, gin.H{
@@ -53,12 +53,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	c.SetCookie("auth_token", token, 86400, "/", "", false, true)
 
 	_ = user
-	c.Redirect(http.StatusFound, "/dashboard")
+	c.Redirect(http.StatusFound, "/staff/dashboard")
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
 	c.SetCookie("auth_token", "", -1, "/", "", false, true)
-	c.Redirect(http.StatusFound, "/login")
+	c.Redirect(http.StatusFound, "/staff/login")
 }
 
 func (h *AuthHandler) ShowRegister(c *gin.Context) {
@@ -84,7 +84,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	c.Redirect(http.StatusFound, "/login?registered=1")
+	c.Redirect(http.StatusFound, "/staff/login?registered=1")
 }
 
 func (h *AuthHandler) ShowProfile(c *gin.Context) {

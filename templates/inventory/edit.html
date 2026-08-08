@@ -3,7 +3,7 @@
 
 <div class="max-w-2xl">
   <div class="flex items-center gap-3 mb-6">
-    <a href="/inventory/{{.product.ID}}" class="text-gray-400 hover:text-gray-600"><i class="fas fa-arrow-left"></i></a>
+    <a href="/staff/inventory/{{.product.ID}}" class="text-gray-400 hover:text-gray-600"><i class="fas fa-arrow-left"></i></a>
     <h1 class="text-2xl font-bold text-gray-900">Edit Product</h1>
   </div>
 
@@ -16,9 +16,19 @@
 
   {{with .product}}
   <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-    <form method="POST" action="/inventory/{{.ID}}/edit" class="space-y-5">
+    <form method="POST" action="/staff/inventory/{{.ID}}/edit" enctype="multipart/form-data" class="space-y-5">
       <input type="hidden" name="_csrf" value="{{$.csrf_token}}">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Photo</label>
+          {{if .ImageURL}}
+          <img src="{{.ImageURL}}" alt="{{.Name}}" class="w-24 h-24 object-cover rounded-lg border border-gray-200 mb-2">
+          {{end}}
+          <input type="file" name="photo" accept="image/jpeg,image/png,image/webp,image/gif"
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-indigo-50 file:text-indigo-700 file:text-sm">
+          <p class="text-xs text-gray-400 mt-1">JPEG, PNG, WEBP, or GIF — up to 5MB. Leave blank to keep the current photo.</p>
+        </div>
 
         <div class="md:col-span-2">
           <label class="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
@@ -83,7 +93,7 @@
       </div>
 
       <div class="flex gap-3 pt-2">
-        <a href="/inventory/{{.ID}}" class="flex-1 border border-gray-200 text-gray-700 py-2 rounded-lg text-sm hover:bg-gray-50 text-center font-medium">
+        <a href="/staff/inventory/{{.ID}}" class="flex-1 border border-gray-200 text-gray-700 py-2 rounded-lg text-sm hover:bg-gray-50 text-center font-medium">
           Cancel
         </a>
         <button type="submit" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-sm hover:bg-indigo-700 font-medium">
@@ -98,7 +108,7 @@
   <div class="bg-red-50 border border-red-200 rounded-xl p-5 mt-4">
     <h3 class="font-semibold text-red-800 mb-2">Danger Zone</h3>
     <p class="text-sm text-red-600 mb-3">Deactivating this product will hide it from inventory and sales.</p>
-    <form method="POST" action="/inventory/{{.ID}}/delete"
+    <form method="POST" action="/staff/inventory/{{.ID}}/delete"
           onsubmit="return confirm('Deactivate this product?')">
       <input type="hidden" name="_csrf" value="{{$.csrf_token}}">
       <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700">

@@ -33,31 +33,31 @@
     {{end}}
 
     <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-      <a href="/dashboard" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
+      <a href="/staff/dashboard" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
         <i class="fas fa-tachometer-alt w-5 text-center text-indigo-300"></i> Dashboard
       </a>
-      <a href="/inventory" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
+      <a href="/staff/inventory" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
         <i class="fas fa-boxes w-5 text-center text-indigo-300"></i> Inventory
       </a>
-      <a href="/sales/pos" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
+      <a href="/staff/sales/pos" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
         <i class="fas fa-cash-register w-5 text-center text-indigo-300"></i> Point of Sale
       </a>
-      <a href="/sales" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
+      <a href="/staff/sales" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
         <i class="fas fa-receipt w-5 text-center text-indigo-300"></i> Sales
       </a>
-      <a href="/payments" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
+      <a href="/staff/payments" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
         <i class="fas fa-mobile-alt w-5 text-center text-indigo-300"></i> M-Pesa
       </a>
-      <a href="/dashboard/pl" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
+      <a href="/staff/dashboard/pl" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
         <i class="fas fa-chart-line w-5 text-center text-indigo-300"></i> P&amp;L Report
       </a>
-      <a href="/reports" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
+      <a href="/staff/reports" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
         <i class="fas fa-file-alt w-5 text-center text-indigo-300"></i> Reports
       </a>
       {{if .claims}}{{if isAdmin .claims.Role}}
       <div class="pt-3 mt-3 border-t border-indigo-800">
         <p class="px-3 text-xs text-indigo-400 uppercase tracking-wider font-semibold mb-2">Admin</p>
-        <a href="/admin/users" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
+        <a href="/staff/admin/users" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-white/10 text-sm font-medium transition">
           <i class="fas fa-users w-5 text-center text-indigo-300"></i> Users
         </a>
       </div>
@@ -65,10 +65,10 @@
     </nav>
 
     <div class="px-3 py-3 border-t border-indigo-800 space-y-1">
-      <a href="/profile" class="flex items-center gap-3 px-3 py-2 rounded-lg text-indigo-200 hover:bg-white/10 text-sm transition">
+      <a href="/staff/profile" class="flex items-center gap-3 px-3 py-2 rounded-lg text-indigo-200 hover:bg-white/10 text-sm transition">
         <i class="fas fa-user-circle w-5 text-center"></i> Profile
       </a>
-      <a href="/logout" class="flex items-center gap-3 px-3 py-2 rounded-lg text-indigo-200 hover:bg-white/10 text-sm transition">
+      <a href="/staff/logout" class="flex items-center gap-3 px-3 py-2 rounded-lg text-indigo-200 hover:bg-white/10 text-sm transition">
         <i class="fas fa-sign-out-alt w-5 text-center"></i> Logout
       </a>
     </div>

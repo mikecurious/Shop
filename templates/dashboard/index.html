@@ -7,7 +7,7 @@
       <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
       <p class="text-gray-500 text-sm">Real-time business overview</p>
     </div>
-    <button hx-get="/partials/stats" hx-target="#stats-grid" hx-swap="innerHTML"
+    <button hx-get="/staff/partials/stats" hx-target="#stats-grid" hx-swap="innerHTML"
             class="bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm flex items-center gap-2 shadow-sm">
       <span class="htmx-indicator"><i class="fas fa-spinner fa-spin"></i></span>
       <i class="fas fa-sync-alt htmx-request-hide"></i> Refresh
@@ -57,7 +57,7 @@
     <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
       <div class="flex items-center justify-between mb-4">
         <h2 class="font-semibold text-gray-800">Revenue & Profit — Last 30 Days</h2>
-        <a href="/dashboard/pl" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Full report →</a>
+        <a href="/staff/dashboard/pl" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Full report →</a>
       </div>
       <canvas id="revenueChart" height="100"></canvas>
     </div>
@@ -75,7 +75,7 @@
       {{if .lowStock}}
       <div class="space-y-2 max-h-56 overflow-y-auto">
         {{range .lowStock}}
-        <a href="/inventory/{{.ID}}" class="flex items-center justify-between py-2 border-b border-gray-50 hover:bg-gray-50 px-1 rounded">
+        <a href="/staff/inventory/{{.ID}}" class="flex items-center justify-between py-2 border-b border-gray-50 hover:bg-gray-50 px-1 rounded">
           <div>
             <p class="text-sm font-medium text-gray-800">{{.Name}}</p>
             <p class="text-xs text-gray-400">{{.SKU}}</p>
@@ -86,7 +86,7 @@
         </a>
         {{end}}
       </div>
-      <a href="/inventory?low_stock=1" class="block text-center text-xs text-indigo-600 hover:text-indigo-800 mt-3 font-medium">
+      <a href="/staff/inventory?low_stock=1" class="block text-center text-xs text-indigo-600 hover:text-indigo-800 mt-3 font-medium">
         View all →
       </a>
       {{else}}
@@ -139,10 +139,10 @@
 
 <!-- FAB -->
 <div class="fixed bottom-6 right-6 flex flex-col items-end gap-3 z-50">
-  <a href="/inventory/create" class="bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 w-10 h-10 rounded-full flex items-center justify-center shadow-lg" title="Add Product">
+  <a href="/staff/inventory/create" class="bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 w-10 h-10 rounded-full flex items-center justify-center shadow-lg" title="Add Product">
     <i class="fas fa-plus text-sm"></i>
   </a>
-  <a href="/sales/pos" class="bg-indigo-600 hover:bg-indigo-700 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-xl transition" title="Point of Sale">
+  <a href="/staff/sales/pos" class="bg-indigo-600 hover:bg-indigo-700 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-xl transition" title="Point of Sale">
     <i class="fas fa-cash-register text-xl"></i>
   </a>
 </div>

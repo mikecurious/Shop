@@ -89,7 +89,7 @@ func (h *SaleHandler) CreateSale(c *gin.Context) {
 		"payment_method": string(sale.PaymentMethod),
 		"customer_name":  sale.CustomerName,
 		"created_at":     sale.CreatedAt,
-		"receipt_url":    fmt.Sprintf("/sales/%s/receipt/pdf", sale.ID),
+		"receipt_url":    fmt.Sprintf("/staff/sales/%s/receipt/pdf", sale.ID),
 	})
 }
 

@@ -204,6 +204,7 @@ type CreateProductRequest struct {
 	ReorderLevel  int     `json:"reorder_level" form:"reorder_level"`
 	SupplierName  string  `json:"supplier_name" form:"supplier_name"`
 	SupplierPhone string  `json:"supplier_phone" form:"supplier_phone"`
+	ImageURL      string  `json:"image_url" form:"-"`
 }
 
 type UpdateProductRequest struct {
@@ -216,6 +217,7 @@ type UpdateProductRequest struct {
 	ReorderLevel  int     `json:"reorder_level" form:"reorder_level"`
 	SupplierName  string  `json:"supplier_name" form:"supplier_name"`
 	SupplierPhone string  `json:"supplier_phone" form:"supplier_phone"`
+	ImageURL      string  `json:"image_url" form:"-"`
 }
 
 type StockMovementRequest struct {
